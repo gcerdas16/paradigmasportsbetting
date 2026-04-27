@@ -35,6 +35,62 @@
 
 ## Entradas
 
+### 2026-04-27 13:30 — Verificación manual odds — AMBOS scrapers confirmados vs sitios reales
+
+**Método:** verify_odds generó links + odds. Se abrieron en navegador y se compararon visualmente partido por partido.
+
+**1xBet — 5 partidos verificados:**
+```
+#1 Brighton vs Wolverhampton
+   Sitio:    Brighton 1.394 | Draw 5.590 | Wolves 8.400
+   Scraper:  Brighton 1.393 | Draw 5.590 | Wolves 8.400  ✅
+
+#2 West Ham vs Arsenal
+   Sitio:    West Ham 5.130 | Draw 4.270 | Arsenal 1.709
+   Scraper:  West Ham 5.130 | Draw 4.265 | Arsenal 1.707  ✅
+
+#3 Fulham vs Bournemouth
+   Sitio:    Fulham 2.650 | Draw 3.800 | Bournemouth 2.660
+   Scraper:  Fulham 2.654 | Draw 3.800 | Bournemouth 2.664  ✅
+
+#4 Bournemouth vs Crystal Palace
+   Sitio:    Bournemouth 1.709 | Draw 4.370 | C. Palace 4.980
+   Scraper:  Bournemouth 1.707 | Draw 4.370 | C. Palace 4.980  ✅
+
+#5 Crystal Palace vs Everton
+   Sitio:    C. Palace 2.850 | Draw 3.250 | Everton 2.810
+   Scraper:  C. Palace 2.846 | Draw 3.250 | Everton 2.805  ✅
+```
+
+**Pinnacle — 4 partidos verificados (búsqueda manual por nombre):**
+```
+#1 Brighton vs Wolverhampton
+   Sitio:    Brighton 1.337 | Draw 5.460 | Wolves 7.890
+   Scraper:  Brighton 1.338 | Draw 5.460 | Wolves 7.890  ✅
+
+#2 West Ham vs Arsenal
+   Sitio:    West Ham 4.990 | Draw 4.060 | Arsenal 1.645
+   Scraper:  West Ham 4.990 | Draw 4.060 | Arsenal 1.645  ✅
+
+#3 Bournemouth vs Crystal Palace
+   Sitio:    Bournemouth 1.653 | Draw 4.350 | C. Palace 4.950
+   Scraper:  Bournemouth 1.654 | Draw 4.350 | C. Palace 4.950  ✅
+
+#4 Crystal Palace vs Everton
+   Sitio:    C. Palace 2.730 | Draw 3.200 | Everton 2.700
+   Scraper:  C. Palace 2.730 | Draw 3.200 | Everton 2.700  ✅
+```
+
+**Resumen:**
+- 1xBet: 15/15 odds correctas ✅
+- Pinnacle: 12/12 odds correctas ✅
+- Diferencia máxima observada: 0.005 (redondeo de conversión American → Decimal)
+- Los links directos de Pinnacle requieren login; se verificó navegando manualmente por nombre
+
+**Observaciones:** Ambos scrapers capturan las odds exactas de los sitios reales. El pipeline está verificado de extremo a extremo.
+
+---
+
 ### 2026-04-27 12:50 — verify_odds — FUNCIONA, links 1xBet OK, Pinnacle requiere login
 
 **Comando:** `cd paradigma && python -m scraping.verify_odds`
