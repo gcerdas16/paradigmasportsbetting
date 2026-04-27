@@ -32,7 +32,53 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 13:35 — Multi-book: 1xBet + MelBet + 20Bet + sanity checks
+### 🔴 2026-04-27 14:00 — API Sniffer para bet365 y DoradoBet
+
+**Qué cambió:**
+1. **Nuevo: `scraping/api_sniffer.py`** — Script que abre cualquier bookmaker en Playwright, captura TODO el tráfico de API, y lo guarda en JSON para análisis.
+
+**Comandos (ejecutar uno a la vez, NO headless para que se vea el browser):**
+
+```bash
+cd paradigmasportsbetting
+git pull
+cd paradigma
+
+# bet365 — abre el browser visible
+python -m scraping.api_sniffer bet365
+
+# DoradoBet
+python -m scraping.api_sniffer doradobet
+
+# MelBet (si no funcionó antes)
+python -m scraping.api_sniffer melbet
+
+# 20Bet
+python -m scraping.api_sniffer 20bet
+```
+
+**⚠️ IMPORTANTE:**
+- El browser se abre VISIBLE (no headless) para que puedas ver si carga bien
+- bet365 puede pedir captcha o redirigir — eso es OK, el sniffer captura lo que pueda
+- DoradoBet: si la URL no carga, buscar la URL correcta de fútbol en el sitio
+- El script captura ~30 segundos de tráfico por página
+
+**Output:**
+Los archivos se guardan en `scraping_debug/api_sniff/`:
+- `bet365_api_*.json` — todos los requests interceptados
+- `bet365_screenshot_*.png` — screenshot de la página
+- `bet365_page_*.html` — HTML de la página
+
+**Qué pegar en RESULTADOS_TEST.md:**
+Para cada sitio, pegar:
+1. El bloque "RESUMEN" del output (dominios, top endpoints JSON)
+2. Si hubo captcha o redirect
+3. Si la sección de fútbol cargó correctamente
+4. El nombre del archivo JSON generado (para que yo lo analice después)
+
+---
+
+### ✅ 2026-04-27 13:35 — Multi-book: 1xBet + MelBet + 20Bet + sanity checks
 
 **Qué cambió:**
 1. **onexbet_scraper.py**: Ahora soporta 3 casas: `1xbet`, `melbet`, `20bet` (mismo backend BetB2B). Solo se cambia `book_key` en el constructor.
