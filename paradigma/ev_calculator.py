@@ -100,14 +100,17 @@ def find_value_bets(
 
         pinnacle_market = pinnacle_data[event_id][market]
 
-        # CRÍTICO: Verificar que el bookmaker tiene el mismo número de
-        # outcomes que Pinnacle para este mercado. Evita comparar
-        # 2-way (moneyline incl OT) vs 3-way (reglamentario con Draw).
-        pinnacle_n = len(pinnacle_market)
-        book_n = soft_outcome_counts[(event_id, row["book_key"], market)]
-        if book_n != pinnacle_n:
-            market_mismatch_count += 1
-            continue
+        # CRÍTICO para h2h: Verificar que el bookmaker tiene el mismo número
+        # de outcomes que Pinnacle. Evita comparar 2-way (moneyline incl OT)
+        # vs 3-way (reglamentario con Draw).
+        # Para totals/spreads NO aplica: cada línea es siempre 2-way
+        # (Over/Under o Home/Away HC), pero el total de líneas varía.
+        if market == "h2h":
+            pinnacle_n = len(pinnacle_market)
+            book_n = soft_outcome_counts[(event_id, row["book_key"], market)]
+            if book_n != pinnacle_n:
+                market_mismatch_count += 1
+                continue
 
         outcome_key = (outcome_name, outcome_point)
 
@@ -115,26 +118,92 @@ def find_value_bets(
         if outcome_key not in pinnacle_market:
             continue
 
-        # Obtener todas las odds de Pinnacle para este mercado
-        pinnacle_odds_list = list(pinnacle_market.values())
-
         # Aplicar filtros básicos
         if book_odds < config.MIN_ODDS_DECIMAL or book_odds > config.MAX_ODDS_DECIMAL:
             continue
 
-        # Shin devig sobre las odds de Pinnacle
-        fair_probs = shin_devig(pinnacle_odds_list)
-        if not fair_probs:
-            continue
+        # Para totals/spreads: devig por LÍNEA (par Over/Under o Home/Away HC)
+        # Para h2h: devig sobre todos los outcomes (Home/Draw/Away)
+        if market in ("totals", "spreads") and outcome_point is not None:
+            # Encontrar el par complementario para esta línea
+            if market == "totals":
+                complement_name = "Under" if outcome_name == "Over" else "Over"
+            else:  # spreads
+                # El complementario es el otro equipo en la misma línea
+                complement_point = -outcome_point
+                complement_candidates = [
+                    (k, v) for k, v in pinnacle_market.items()
+                    if k[1] is not None and abs(k[1] - complement_point) < 0.001
+                ]
+                if not complement_candidates:
+                    continue
+                complement_key, complement_odds = complement_candidates[0]
+                line_odds = [pinnacle_market[outcome_key], complement_odds]
+                line_keys = [outcome_key, complement_key]
+                fair_probs = shin_devig(line_odds)
+                if not fair_probs:
+                    continue
+                fair_prob = fair_probs[0]  # Primer elemento = nuestro outcome
+                # Saltar al cálculo de EV
+                ev_pct = calculate_ev_percent(book_odds, fair_prob)
+                if ev_pct < config.MIN_EV_PERCENT:
+                    continue
+                kelly_full = calculate_kelly(book_odds, fair_prob)
+                kelly_stake = min(
+                    kelly_full * config.KELLY_FRACTION,
+                    config.MAX_KELLY_PERCENT / 100.0,
+                )
+                if kelly_stake <= 0:
+                    continue
+                pinnacle_odds_now = pinnacle_market.get(outcome_key)
+                vb = ValueBet(
+                    event_id=event_id,
+                    sport_key=row["sport_key"],
+                    sport_title=row["sport_title"],
+                    commence_time=row["commence_time"],
+                    home_team=row["home_team"],
+                    away_team=row["away_team"],
+                    book_key=row["book_key"],
+                    book_title=row["book_title"],
+                    market=market,
+                    outcome_name=outcome_name,
+                    outcome_point=outcome_point,
+                    odds=book_odds,
+                    fair_prob=fair_prob,
+                    ev_percent=ev_pct,
+                    kelly_fraction=kelly_full,
+                    kelly_stake_percent=kelly_stake * 100,
+                    pinnacle_odds=pinnacle_odds_now,
+                    book_link=row.get("book_link"),
+                    market_link=row.get("market_link"),
+                    outcome_link=row.get("outcome_link"),
+                )
+                value_bets.append(vb)
+                continue
 
-        # Encontrar la probabilidad justa de este outcome
-        pinnacle_keys = list(pinnacle_market.keys())
-        try:
-            idx = pinnacle_keys.index(outcome_key)
-        except ValueError:
-            continue
+            # Totals: par Over/Under en la misma línea
+            complement_key = (complement_name, outcome_point)
+            if complement_key not in pinnacle_market:
+                continue
+            line_odds = [pinnacle_market[outcome_key], pinnacle_market[complement_key]]
+            line_keys = [outcome_key, complement_key]
+            fair_probs = shin_devig(line_odds)
+            if not fair_probs:
+                continue
+            fair_prob = fair_probs[0]  # Primer elemento = nuestro outcome
 
-        fair_prob = fair_probs[idx]
+        else:
+            # h2h: devig sobre todos los outcomes (Home/Draw/Away)
+            pinnacle_odds_list = list(pinnacle_market.values())
+            fair_probs = shin_devig(pinnacle_odds_list)
+            if not fair_probs:
+                continue
+            pinnacle_keys = list(pinnacle_market.keys())
+            try:
+                idx = pinnacle_keys.index(outcome_key)
+            except ValueError:
+                continue
+            fair_prob = fair_probs[idx]
 
         # Calcular EV%
         ev_pct = calculate_ev_percent(book_odds, fair_prob)
