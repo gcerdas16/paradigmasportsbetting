@@ -32,6 +32,35 @@
 
 ## Entradas
 
+### 🔴 2026-04-27 12:26 — Script de verificación con links directos
+
+**Qué cambió:**
+1. **Nuevo: `scraping/verify_odds.py`** — Script que scrapea ambos sitios y muestra links directos + odds lado a lado
+2. **onexbet_scraper.py**: Ahora guarda `league_id` para construir links de 1xBet
+
+**Comando:**
+```bash
+cd paradigmasportsbetting
+git pull
+cd paradigma
+python -m scraping.verify_odds
+```
+
+**Qué muestra:**
+Para cada partido emparejado:
+- 🟢 Link directo a Pinnacle (abrir en navegador)
+- 🔵 Link directo a 1xBet (abrir en navegador)
+- Tabla con odds h2h (Home/Draw/Away) de ambos
+- Totals y spreads de la línea principal
+- Verificar que las odds del output ≈ las del sitio real (±0.01)
+
+**Pegar en RESULTADOS_TEST.md:**
+- Los primeros 5 partidos con sus links y odds
+- Si las odds coinciden con lo que muestra el sitio real
+- Si algún link no funciona
+
+---
+
 ### ✅ 2026-04-27 12:13 — FIX: Pinnacle ahora incluye TODAS las líneas
 
 **Qué cambió:**

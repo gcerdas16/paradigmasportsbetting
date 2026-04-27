@@ -289,6 +289,7 @@ class OneXBetScraper:
                 "home_team": parsed["home"],
                 "away_team": parsed["away"],
                 "league": parsed["league"],
+                "league_id": parsed.get("league_id", ""),
                 "commence_time": parsed["start_time"],
                 "sport_key": "soccer",
                 "sport_title": f"Soccer - {parsed['league']}",
@@ -367,11 +368,14 @@ class OneXBetScraper:
         if spreads_odds:
             markets["spreads"] = spreads_odds
 
+        league_id = event.get("LI", "")
+
         return {
             "event_id": event_id,
             "home": home,
             "away": away,
             "league": league,
+            "league_id": league_id,
             "start_time": start_time,
             "markets": markets,
         }
