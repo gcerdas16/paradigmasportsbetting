@@ -25,14 +25,14 @@
 | 1xBet scraper | ✅ Funcionando (155 eventos) |
 | Event matcher | ✅ Limpio (94 emparejados, Bookings excluidos) |
 | EV calc — h2h | ✅ Funcionando (7 near misses detectados) |
-| EV calc — totals | ❓ Diagnóstico pendiente (0 near misses) |
-| EV calc — spreads | ❓ Diagnóstico pendiente (0 near misses) |
+| EV calc — totals | ✅ Funcionando (1 near miss, 750 matched) |
+| EV calc — spreads | ✅ Funcionando (8 near misses, 356 matched) |
 
 ---
 
 ## Entradas
 
-### 🔴 2026-04-27 12:13 — FIX: Pinnacle ahora incluye TODAS las líneas
+### ✅ 2026-04-27 12:13 — FIX: Pinnacle ahora incluye TODAS las líneas
 
 **Qué cambió:**
 1. **pinnacle_scraper.py**: Removido filtro `isAlternate` para totals y spreads. Ahora captura TODAS las líneas (2.5, 2.75, 3.0, 3.25, 3.5...) en vez de solo la main line

@@ -303,8 +303,23 @@ El scraper produce exactamente el mismo formato que `OddsClient`:
 - **Flujo**: Pinnacle scrape → 1xBet scrape → match eventos → calcular EV
 - **Event matcher** (`scraping/event_matcher.py`): fuzzy matching por nombre + verificación de liga
 - **Costo: $0** (vs $60/mes de The Odds API)
-- **Resultados**: 94 partidos emparejados, 1,978 odds analizadas, value bets detectadas
-- **Protecciones**: EV cap >30% (descarta falsos positivos por mismatch)
+- **3 mercados funcionando**: h2h (194 matched), totals (750 matched), spreads (356 matched)
+- **Resultados test final**: 94 partidos emparejados, 1,834 odds analizadas, 15 near misses (6 h2h + 8 spreads + 1 totals)
+- **Protecciones**: EV cap >30% (descarta falsos positivos), excluye Bookings/Corners, names_match estricto
+- **Bugs resueltos**:
+  - Matcher incluía eventos sin odds → filtrado a solo eventos con odds
+  - Falsos positivos Bookings/Corners → excluidos por pattern matching
+  - Man Utd ≠ Man City → require ALL significant words match
+  - 2-way vs 3-way mismatch → solo aplicar a h2h
+  - Totals/spreads descartados por devig de mercado completo → devig por línea (par Over/Under)
+  - Pinnacle solo main line → incluir TODAS las líneas alternativas
+  - Spreads team names no matchean → traducir 1xBet→Pinnacle names
+  - Puntos int vs float → forzar float en ambos scrapers
+
+### Comunicación cross-PC via GitHub (2026-04-27)
+- **`RESULTADOS_TEST.md`**: escribe SOLO la PC personal (output de tests)
+- **`NOTAS_DEV.md`**: escribe SOLO la PC corporativa (cambios de código, qué probar)
+- Elimina necesidad de copiar/pegar resultados por email entre PCs
 
 ### Archivos nuevos del módulo scraping
 | Archivo | Función |
