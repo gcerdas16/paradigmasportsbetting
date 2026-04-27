@@ -293,3 +293,36 @@ El scraper produce exactamente el mismo formato que `OddsClient`:
 - TODO: 1xBet scraper (basado en repos/sports-arbitrage-1xbet)
 - TODO: Integrar soft odds con `scraping_client.py`
 - Mientras tanto, The Odds API sigue funcionando para soft books
+
+---
+
+## Flujo de trabajo (2026-04-27)
+
+- **Repo GitHub**: https://github.com/gcerdas16/paradigmasportsbetting.git
+- **Desarrollo**: PC corporativa (Windsurf IDE) — escribir código, análisis, diseño
+- **Pruebas/ejecución**: PC personal del usuario — correr scrapers, tests de red
+- **Motivo**: Red corporativa (OpenDNS) bloquea todos los sitios de apuestas
+- **Sincronización**: git push → git pull entre ambas PCs
+
+---
+
+## Resultados de tests desde PC personal (2026-04-27)
+
+| Sitio | Estado |
+|-------|--------|
+| **Pinnacle** (quick) | ✅ 77 partidos, 2252 markets |
+| **Pinnacle** (completo) | ✅ Champions, Europa League, Serie A, etc. |
+| **1xBet** | ✅ API interna interceptada |
+| **888sport** | ✅ Accesible |
+| **DraftKings** | ✅ Accesible |
+| **bet365** | ✅ Accesible (¡NO disponible en The Odds API!) |
+| **WilliamHill** | ✅ Accesible |
+| **Unibet** | ✅ Accesible |
+| **BetMGM** | ✅ Accesible |
+| **Betway** | ⚠️ Cargó sin título |
+| **FanDuel** | ⚠️ Bloqueado (plataforma US-only) |
+
+### Hallazgos clave
+- **1xBet API interceptable** → podemos construir scraper igual que Pinnacle
+- **bet365 accesible** → gran ventaja, The Odds API NO lo tiene
+- **8 de 10 casas accesibles** desde PC personal
