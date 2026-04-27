@@ -35,6 +35,25 @@
 
 ## Entradas
 
+### 2026-04-27 12:32 — verify_odds — ERROR al iniciar
+
+**Comando:** `cd paradigma && python -m scraping.verify_odds`
+**Duración:** ~2 min (crash al terminar Pinnacle scraping)
+**Exit code:** 1
+
+**Error:**
+```
+AttributeError: 'OneXBetScraper' object has no attribute 'scrape_all_football'
+  File "paradigma/scraping/verify_odds.py", line 48, in verify
+    onexbet_data, xbet_events = xbet_scraper.scrape_all_football()
+```
+
+**Diagnóstico:** `verify_odds.py` llama a `xbet_scraper.scrape_all_football()` pero ese método no existe en `OneXBetScraper`. El método correcto probablemente es otro nombre — revisar `onexbet_scraper.py` para ver el nombre real del método público.
+
+**Pinnacle sí funcionó:** 112 eventos capturados antes del crash.
+
+---
+
 ### 2026-04-27 12:20 — FIX Pinnacle todas las líneas — TOTALS Y SPREADS FUNCIONAN
 
 **Comando:** `cd paradigma && python -m scraping.scanner_v2`
