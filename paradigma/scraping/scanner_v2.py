@@ -174,6 +174,25 @@ def scan_once(headless: bool = True) -> list:
     for mk in sorted(market_counts.keys()):
         logger.info(f"     {mk}: {market_counts[mk]} odds, {market_matched.get(mk, 0)} matched")
 
+    # Diagnóstico detallado: mostrar keys que NO matchean para totals/spreads
+    for debug_market in ("totals", "spreads"):
+        shown = 0
+        for row in soft_book_rows:
+            if row["market"] != debug_market or shown >= 3:
+                continue
+            eid = row["event_id"]
+            ok = (row["outcome_name"], row["outcome_point"])
+            if eid in unified_pinnacle and debug_market in unified_pinnacle[eid]:
+                pin_keys = list(unified_pinnacle[eid][debug_market].keys())
+                if ok not in unified_pinnacle[eid][debug_market]:
+                    logger.info(
+                        f"   🔍 {debug_market} MISMATCH [{row['home_team']} vs {row['away_team']}]:"
+                        f"\n        1xBet key:    {ok!r}  (type: {type(ok[0]).__name__}, {type(ok[1]).__name__})"
+                        f"\n        Pinnacle keys: {pin_keys[:6]}"
+                        f"\n        Pinnacle types: {[(type(k[0]).__name__, type(k[1]).__name__) for k in pin_keys[:3]]}"
+                    )
+                    shown += 1
+
     # Calcular value bets con umbral bajo para capturar near-misses
     real_threshold = config.MIN_EV_PERCENT
     original = config.MIN_EV_PERCENT

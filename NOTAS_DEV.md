@@ -32,7 +32,37 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 11:52 — Diagnóstico totals/spreads + fix spread names
+### 🔴 2026-04-27 12:01 — Diagnóstico profundo: por qué totals/spreads no matchean
+
+**Qué cambió:**
+1. **scanner_v2.py**: Nuevo log detallado que muestra las keys EXACTAS que no matchean, con tipos de datos. Ejemplo esperado:
+```
+🔍 totals MISMATCH [Arsenal vs Fulham]:
+    1xBet key:    ('Over', 2.5)  (type: str, float)
+    Pinnacle keys: [('Over', 2.5), ('Under', 2.5)]
+    Pinnacle types: [('str', 'float'), ('str', 'float')]
+```
+
+**Comando:**
+```bash
+cd paradigmasportsbetting
+git pull
+cd paradigma
+python -m scraping.scanner_v2
+```
+
+**Qué buscar en el output:**
+- Buscar líneas con `🔍 totals MISMATCH` y `🔍 spreads MISMATCH`
+- Mostrarán: la key de 1xBet vs las keys de Pinnacle + tipos de datos
+- Esto revela si el problema es: tipos (int vs float), nombres ("Over" vs "over"), o puntos diferentes
+
+**Pegar en RESULTADOS_TEST.md:**
+- Las líneas de MISMATCH (máximo 3 por mercado)
+- Lo demás del output normal
+
+---
+
+### ✅ 2026-04-27 11:52 — Diagnóstico totals/spreads + fix spread names
 
 **Qué cambió:**
 1. **ev_calculator.py**: El filtro 2-way vs 3-way ahora solo aplica para h2h (antes bloqueaba totals/spreads)
