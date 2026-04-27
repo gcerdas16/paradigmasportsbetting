@@ -115,6 +115,12 @@ Dominio principal: platform.20bet.com
 - `melbet_api_20260427_230217.json`
 - `20bet_api_20260427_230257.json`
 
+**URLs correctas (confirmadas manualmente):**
+- DoradoBet fútbol: `https://doradobet.com/deportes/66`
+- bet365 fútbol: `https://www.bet365.com/#/AS/B1/K%5E5/`
+
+Hay que correr el sniffer de nuevo con estas URLs para capturar las APIs de odds correctamente.
+
 **Observaciones:** MelBet es la incorporación más fácil — mismo API que 1xBet. Para DoradoBet hay que encontrar la URL correcta manualmente. bet365 requiere ingeniería inversa del protocolo binario. 20Bet requiere análisis adicional del endpoint `sport/list`.
 
 ---
