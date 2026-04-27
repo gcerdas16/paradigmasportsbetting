@@ -149,6 +149,38 @@ Requests: 15 | Datos: 4499.7 KB | JSON: 5 (idéntico a primera corrida)
 
 ---
 
+### 2026-04-27 17:27 — DoradoBet scraper — datos capturados, parser devuelve 0
+
+**Comando:** `cd paradigma && python -m scraping.doradobet_scraper`
+**Duración:** ~25 seg
+**Exit code:** 0
+
+**Output:**
+```
+Altenar data: 20 events, 106 markets, 268 odds  ← captura correcta
+DoradoBet: 0 eventos parseados, 0 con odds      ← bug en parser
+```
+
+**Estructura real de Altenar (del debug):**
+```
+Evento keys: ['marketIds', 'competitorIds', 'startDate', 'id', 'name', 'sportId', ...]
+Ejemplo: { "name": "Huracan vs. Argentinos Juniors",
+           "competitorIds": [46830, 46820],
+           "startDate": "2026-04-28T00:00:00Z", "id": 15469545 }
+
+Mercado keys: ['oddIds', 'typeId', 'isMB', 'id', 'name']
+Ejemplo: { "name": "1x2", "typeId": 1, "oddIds": [3859067504, 3859067505, 3859067506] }
+
+Odd keys: ['typeId', 'price', 'name', 'competitorId', 'id']
+Ejemplo: { "price": 3.0, "name": "Huracan", "typeId": 1, "competitorId": 46830 }
+```
+
+**Debug JSON:** `scraping_debug/doradobet_raw_20260427_232744.json`
+
+**Diagnóstico:** El scraper captura correctamente la API Altenar (20 eventos, 268 odds). El bug está en el parser — las keys reales son `competitorIds` (array), `marketIds`, `oddIds`. El parser probablemente busca claves diferentes.
+
+---
+
 ### 2026-04-27 13:30 — Verificación manual odds — AMBOS scrapers confirmados vs sitios reales
 
 **Método:** verify_odds generó links + odds. Se abrieron en navegador y se compararon visualmente partido por partido.
