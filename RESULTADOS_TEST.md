@@ -149,6 +149,33 @@ Requests: 15 | Datos: 4499.7 KB | JSON: 5 (idéntico a primera corrida)
 
 ---
 
+### 2026-04-27 17:32 — MelBet scanner — FUNCIONA (96 emparejados, 2 near misses)
+
+**Comando:** `cd paradigma && python -m scraping.scanner_v2 --books melbet`
+**Duración:** ~4 min
+**Exit code:** 0
+
+**Output:**
+```
+Pinnacle:  106 eventos con odds
+MelBet:    156 eventos con odds
+Emparejados: 96 partidos
+
+Por mercado (MelBet → matched en Pinnacle):
+  h2h:     288 odds, 238 matched  (83%) ✅
+  spreads: 748 odds, 390 matched  (52%) ✅
+  totals:  936 odds, 804 matched  (86%) ✅
+
+VALUE BETS: 0
+NEAR MISSES (EV 1-5%): 2
+  [h2h]     Leeds United vs Burnley [Vie 01 May — 19:00 UTC] | Burnley @ 7.600 (Pin: 6.83) | EV: +3.05%
+  [spreads] Bologna vs Cagliari [Dom 03 May — 10:30 UTC]     | Bologna -1.5 @ 3.560 (Pin: 3.30) | EV: +1.54%
+```
+
+**Observaciones:** MelBet funciona idéntico a 1xBet (mismo backend BetB2B). Los near misses incluyen la fecha del partido. Los mismatches de totals/spreads extremos (Over 1.5, spreads ±2.5) son normales — líneas que MelBet tiene pero Pinnacle no.
+
+---
+
 ### 2026-04-27 17:27 — DoradoBet scraper — datos capturados, parser devuelve 0
 
 **Comando:** `cd paradigma && python -m scraping.doradobet_scraper`
