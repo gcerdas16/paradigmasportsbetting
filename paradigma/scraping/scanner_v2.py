@@ -45,31 +45,40 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from ev_calculator import find_value_bets
 from scraping.pinnacle_scraper import PinnacleScraper
-from scraping.onexbet_scraper import OneXBetScraper
+from scraping.onexbet_scraper import OneXBetScraper, BOOK_CONFIGS
 from scraping.event_matcher import match_events, names_match
 
 logger = logging.getLogger(__name__)
 
 
-def scan_once(headless: bool = True) -> list:
+def scan_once(headless: bool = True, book_keys: list = None) -> list:
     """
     Ejecuta un ciclo completo de escaneo usando scraping.
 
     1. Scrape Pinnacle (referencia)
-    2. Scrape 1xBet (soft book)
+    2. Scrape soft books (1xBet, MelBet, 20Bet, etc.)
     3. Emparejar eventos
     4. Convertir a formato ev_calculator
     5. Calcular value bets
 
+    Args:
+        headless: ejecutar browsers sin ventana visible
+        book_keys: lista de casas a scrapear (default: solo 1xbet)
+
     Returns:
         Lista de ValueBets encontradas.
     """
+    if book_keys is None:
+        book_keys = ["1xbet"]
+
     logger.info("=" * 60)
     logger.info(f"Scanner v2 (Scraping) — {datetime.now(timezone.utc).isoformat()}")
+    logger.info(f"  Casas: {', '.join(BOOK_CONFIGS[k]['name'] for k in book_keys)}")
     logger.info("=" * 60)
 
     # ── 1. Scrape Pinnacle ──────────────────────────────────────
-    logger.info("\n📊 Paso 1/4: Scraping Pinnacle...")
+    total_steps = 2 + len(book_keys)
+    logger.info(f"\n📊 Paso 1/{total_steps}: Scraping Pinnacle...")
     pinnacle_scraper = PinnacleScraper(headless=headless)
     pinnacle_data, pinnacle_events = pinnacle_scraper.scrape_all_football()
     logger.info(f"   Pinnacle: {len(pinnacle_data)} eventos con odds")
@@ -78,106 +87,102 @@ def scan_once(headless: bool = True) -> list:
         logger.error("No se obtuvieron datos de Pinnacle. Abortando.")
         return []
 
-    # ── 2. Scrape 1xBet ────────────────────────────────────────
-    logger.info("\n🎰 Paso 2/4: Scraping 1xBet...")
-    onexbet_scraper = OneXBetScraper(headless=headless)
-    onexbet_data, onexbet_events = onexbet_scraper.scrape_football_odds()
-    logger.info(f"   1xBet: {len(onexbet_data)} eventos con odds")
-
-    if not onexbet_data:
-        logger.error("No se obtuvieron datos de 1xBet. Abortando.")
-        return []
-
-    # ── 3. Emparejar eventos ────────────────────────────────────
-    logger.info("\n🔗 Paso 3/4: Emparejando eventos Pinnacle ↔ 1xBet...")
-
-    # CRÍTICO: Solo emparejar eventos que TIENEN odds.
-    # events_info incluye todos los matchups; pinnacle_data/onexbet_data
-    # solo tienen los que tienen odds reales.
     pin_events_with_odds = [
         evt for evt in pinnacle_events if evt["event_id"] in pinnacle_data
     ]
-    xbet_events_with_odds = [
-        evt for evt in onexbet_events if evt["event_id"] in onexbet_data
-    ]
-    logger.info(
-        f"   Con odds: {len(pin_events_with_odds)} Pinnacle, "
-        f"{len(xbet_events_with_odds)} 1xBet"
-    )
 
-    matched = match_events(pin_events_with_odds, xbet_events_with_odds)
-    logger.info(f"   Emparejados: {len(matched)} partidos")
-
-    if not matched:
-        logger.warning("No se emparejó ningún evento. Verificar nombres.")
-        logger.info("Ejemplos Pinnacle:")
-        for evt in pin_events_with_odds[:5]:
-            logger.info(f"   {evt['home_team']} vs {evt['away_team']}")
-        logger.info("Ejemplos 1xBet:")
-        for evt in xbet_events_with_odds[:5]:
-            logger.info(f"   {evt['home_team']} vs {evt['away_team']}")
-        return []
-
-    # ── 4. Convertir a formato ev_calculator ────────────────────
-    logger.info("\n📐 Paso 4/4: Calculando EV...")
-
-    # Construir pinnacle_data con event_ids unificados
-    # y soft_book_odds en formato de filas individuales
+    # ── 2. Scrape soft books ──────────────────────────────────────
     unified_pinnacle = {}
     soft_book_rows = []
+    total_matched = 0
 
-    for p_evt, s_evt in matched:
-        p_eid = p_evt["event_id"]
-        s_eid = s_evt["event_id"]
+    for step_i, book_key in enumerate(book_keys, start=2):
+        book_name = BOOK_CONFIGS[book_key]["name"]
+        logger.info(f"\n🎰 Paso {step_i}/{total_steps}: Scraping {book_name}...")
 
-        # Usar el ID de Pinnacle como ID unificado
-        unified_id = p_eid
+        try:
+            scraper = OneXBetScraper(headless=headless, book_key=book_key)
+            soft_data, soft_events = scraper.scrape_football_odds()
+        except Exception as e:
+            logger.error(f"   Error scraping {book_name}: {e}")
+            continue
 
-        # Copiar odds de Pinnacle
-        if p_eid in pinnacle_data:
-            unified_pinnacle[unified_id] = pinnacle_data[p_eid]
+        logger.info(f"   {book_name}: {len(soft_data)} eventos con odds")
 
-        # Convertir odds de 1xBet a filas individuales
-        if s_eid in onexbet_data:
-            # Para spreads: mapear nombres de equipo 1xBet → Pinnacle
-            s_home = s_evt["home_team"]
-            s_away = s_evt["away_team"]
-            p_home = p_evt["home_team"]
-            p_away = p_evt["away_team"]
+        if not soft_data:
+            logger.warning(f"   {book_name}: sin datos, saltando.")
+            continue
 
-            for market_key, outcomes in onexbet_data[s_eid].items():
-                for (outcome_name, outcome_point), odds in outcomes.items():
-                    # Spreads usan nombres de equipo como outcome_name.
-                    # 1xBet puede decir "Man Utd" pero Pinnacle dice
-                    # "Manchester United". Traducimos al nombre de Pinnacle.
-                    final_name = outcome_name
-                    if market_key == "spreads":
-                        if names_match(outcome_name, p_home):
-                            final_name = p_home
-                        elif names_match(outcome_name, p_away):
-                            final_name = p_away
+        # Emparejar con Pinnacle
+        soft_with_odds = [
+            evt for evt in soft_events if evt["event_id"] in soft_data
+        ]
+        logger.info(
+            f"   Con odds: {len(pin_events_with_odds)} Pinnacle, "
+            f"{len(soft_with_odds)} {book_name}"
+        )
 
-                    soft_book_rows.append({
-                        "event_id": unified_id,
-                        "sport_key": "soccer",
-                        "sport_title": f"Soccer - {p_evt.get('league', '')}",
-                        "commence_time": p_evt.get("commence_time", ""),
-                        "home_team": p_evt["home_team"],
-                        "away_team": p_evt["away_team"],
-                        "book_key": "onexbet",
-                        "book_title": "1xBet",
-                        "market": market_key,
-                        "outcome_name": final_name,
-                        "outcome_point": outcome_point,
-                        "odds": odds,
-                        "book_link": None,
-                        "market_link": None,
-                        "outcome_link": None,
-                    })
+        matched = match_events(pin_events_with_odds, soft_with_odds)
+        logger.info(f"   Emparejados: {len(matched)} partidos")
+        total_matched += len(matched)
 
+        if not matched:
+            logger.warning(f"   {book_name}: 0 partidos emparejados.")
+            continue
+
+        # Convertir a filas
+        for p_evt, s_evt in matched:
+            p_eid = p_evt["event_id"]
+            s_eid = s_evt["event_id"]
+            unified_id = p_eid
+
+            if p_eid in pinnacle_data:
+                unified_pinnacle[unified_id] = pinnacle_data[p_eid]
+
+            if s_eid in soft_data:
+                p_home = p_evt["home_team"]
+                p_away = p_evt["away_team"]
+
+                for market_key, outcomes in soft_data[s_eid].items():
+                    for (outcome_name, outcome_point), odds in outcomes.items():
+                        final_name = outcome_name
+                        if market_key == "spreads":
+                            if names_match(outcome_name, p_home):
+                                final_name = p_home
+                            elif names_match(outcome_name, p_away):
+                                final_name = p_away
+
+                        soft_book_rows.append({
+                            "event_id": unified_id,
+                            "sport_key": "soccer",
+                            "sport_title": f"Soccer - {p_evt.get('league', '')}",
+                            "commence_time": p_evt.get("commence_time", ""),
+                            "home_team": p_evt["home_team"],
+                            "away_team": p_evt["away_team"],
+                            "book_key": book_key,
+                            "book_title": book_name,
+                            "market": market_key,
+                            "outcome_name": final_name,
+                            "outcome_point": outcome_point,
+                            "odds": odds,
+                            "book_link": None,
+                            "market_link": None,
+                            "outcome_link": None,
+                        })
+
+    if not soft_book_rows:
+        logger.error("No se obtuvieron odds de ninguna casa blanda. Abortando.")
+        return []
+
+    # ── Paso final: Calcular EV ────────────────────────────────────
+    logger.info(f"\n📐 Paso {total_steps}/{total_steps}: Calculando EV...")
+    books_summary = {}
+    for row in soft_book_rows:
+        books_summary[row["book_title"]] = books_summary.get(row["book_title"], 0) + 1
     logger.info(
         f"   Pinnacle: {len(unified_pinnacle)} eventos"
-        f"   | 1xBet: {len(soft_book_rows)} odds individuales"
+        f"   | Soft books: {sum(books_summary.values())} odds "
+        f"({', '.join(f'{k}: {v}' for k, v in books_summary.items())})"
     )
 
     # Diagnóstico: cuántas odds por mercado y cuántas matchean con Pinnacle
@@ -190,7 +195,7 @@ def scan_once(headless: bool = True) -> list:
         ok = (row["outcome_name"], row["outcome_point"])
         if eid in unified_pinnacle and mk in unified_pinnacle[eid] and ok in unified_pinnacle[eid][mk]:
             market_matched[mk] = market_matched.get(mk, 0) + 1
-    logger.info(f"   Por mercado (1xBet → matched en Pinnacle):")
+    logger.info(f"   Por mercado (soft books → matched en Pinnacle):")
     for mk in sorted(market_counts.keys()):
         logger.info(f"     {mk}: {market_counts[mk]} odds, {market_matched.get(mk, 0)} matched")
 
@@ -293,7 +298,7 @@ def print_results(value_bets: list, near_misses: list = None):
         print(f"    EV promedio: {avg_ev:+.2f}%")
         print(f"    Kelly promedio: {avg_kelly:.2f}%")
         print(f"    Por mercado: {markets}")
-        print(f"    Fuente: Pinnacle (scraping) vs 1xBet (scraping)")
+        print(f"    Fuente: Pinnacle (scraping) vs soft books (scraping)")
         print(f"    Costo: $0")
 
     # Near-misses: diagnóstico de oportunidades cercanas
@@ -327,10 +332,26 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    print("\n🚀 Scanner v2 — Scraping Mode (Pinnacle + 1xBet)")
+    # Parsear argumentos: --books 1xbet,melbet,20bet
+    import argparse
+    parser = argparse.ArgumentParser(description="Scanner v2 — Scraping multi-book")
+    parser.add_argument(
+        "--books", type=str, default="1xbet",
+        help=f"Casas a scrapear separadas por coma. Disponibles: {', '.join(BOOK_CONFIGS.keys())}"
+    )
+    parser.add_argument("--no-headless", action="store_true", help="Mostrar browsers")
+    args = parser.parse_args()
+
+    book_keys = [k.strip() for k in args.books.split(",")]
+    book_names = [BOOK_CONFIGS[k]["name"] for k in book_keys if k in BOOK_CONFIGS]
+
+    print(f"\n🚀 Scanner v2 — Scraping Mode (Pinnacle + {' + '.join(book_names)})")
     print(f"   Umbral EV: >{config.MIN_EV_PERCENT}%")
     print(f"   Kelly: ÷{int(1/config.KELLY_FRACTION)}, cap {config.MAX_KELLY_PERCENT}%")
     print(f"   Modo: {'PAPER' if config.PAPER_TRADING else 'REAL'}")
 
-    value_bets, near_misses = scan_once(headless=True)
+    value_bets, near_misses = scan_once(
+        headless=not args.no_headless,
+        book_keys=book_keys,
+    )
     print_results(value_bets, near_misses)

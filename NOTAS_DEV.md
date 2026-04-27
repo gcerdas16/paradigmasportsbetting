@@ -32,7 +32,52 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 12:26 — Script de verificación con links directos
+### 🔴 2026-04-27 13:35 — Multi-book: 1xBet + MelBet + 20Bet + sanity checks
+
+**Qué cambió:**
+1. **onexbet_scraper.py**: Ahora soporta 3 casas: `1xbet`, `melbet`, `20bet` (mismo backend BetB2B). Solo se cambia `book_key` en el constructor.
+2. **scanner_v2.py**: Soporta múltiples soft books. Argumento `--books 1xbet,melbet,20bet` para scrapear las 3.
+3. **ev_calculator.py**: Sanity check — descarta comparaciones con odds ratio >3x (protege contra datos erróneos).
+4. **verify_odds.py**: Fix spreads — ahora compara por clave exacta (team, signed_point), no por abs().
+
+**Comandos:**
+
+Solo 1xBet (como antes):
+```bash
+cd paradigma
+python -m scraping.scanner_v2
+```
+
+Las 3 casas (NUEVO):
+```bash
+cd paradigma
+python -m scraping.scanner_v2 --books 1xbet,melbet,20bet
+```
+
+Probar MelBet sola:
+```bash
+cd paradigma
+python -m scraping.scanner_v2 --books melbet
+```
+
+**⚠️ IMPORTANTE:** MelBet y 20Bet podrían no funcionar si:
+- Tienen URLs diferentes (no usan `/en/line/football`)
+- La API usa un dominio diferente
+- Requieren cookies o geolocalización especial
+
+**Qué buscar:**
+1. ¿MelBet devuelve eventos? ¿Cuántos?
+2. ¿20Bet devuelve eventos?
+3. ¿Los emparejamientos con Pinnacle funcionan?
+4. ¿Aparecen más value bets / near misses con más casas?
+
+**Pegar en RESULTADOS_TEST.md:**
+- Output de cada casa por separado + output combinado
+- Si alguna casa falla, el error exacto
+
+---
+
+### ✅ 2026-04-27 12:26 — Script de verificación con links directos
 
 **Qué cambió:**
 1. **Nuevo: `scraping/verify_odds.py`** — Script que scrapea ambos sitios y muestra links directos + odds lado a lado

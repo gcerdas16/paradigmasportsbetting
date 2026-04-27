@@ -158,18 +158,20 @@ def verify():
         xbet_spreads = onexbet_data.get(s_eid, {}).get("spreads", {})
 
         if pin_spreads and xbet_spreads:
-            pin_sp_points = {abs(k[1]) for k in pin_spreads}
-            xbet_sp_points = {abs(k[1]) for k in xbet_spreads}
-            common_sp = sorted(pin_sp_points & xbet_sp_points)
+            # Match by EXACT key (team, signed_point) — no abs()
+            pin_sp_keys = {k for k in pin_spreads if k[0] == home}
+            xbet_sp_keys = {k for k in xbet_spreads if k[0] == home}
+            common_sp = sorted(pin_sp_keys & xbet_sp_keys, key=lambda k: abs(k[1]))
 
             if common_sp:
-                pt = common_sp[0]
-                # Find home spread
-                p_home_sp = pin_spreads.get((home, -pt)) or pin_spreads.get((home, pt))
-                x_home_sp = xbet_spreads.get((home, -pt)) or xbet_spreads.get((home, pt))
-                if p_home_sp and x_home_sp:
-                    print(f"     Spread ±{pt}:")
-                    print(f"       {home}: Pinnacle {p_home_sp:.3f}  |  1xBet {x_home_sp:.3f}")
+                key = common_sp[0]
+                p_home_sp = pin_spreads[key]
+                x_home_sp = xbet_spreads[key]
+                # Sanity check: odds should be within 3x of each other
+                ratio = max(p_home_sp, x_home_sp) / min(p_home_sp, x_home_sp)
+                flag = " ⚠️ ANOMALÍA" if ratio > 3.0 else ""
+                print(f"     Spread {key[1]:+.1f} {home}:")
+                print(f"       Pinnacle {p_home_sp:.3f}  |  1xBet {x_home_sp:.3f}{flag}")
 
         print()
 

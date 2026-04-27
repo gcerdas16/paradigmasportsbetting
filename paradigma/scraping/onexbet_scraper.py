@@ -29,21 +29,60 @@ logger = logging.getLogger(__name__)
 # Constantes
 # ---------------------------------------------------------------------------
 
-# Dominio de la API interna (redirige a la versión Costa Rica)
-ONEXBET_API_DOMAIN = "cr.1xbet.com"
-
-# URL de fútbol pre-match
-ONEXBET_FOOTBALL_URL = "https://1xbet.com/en/line/football"
-
-# Endpoints de la API que queremos interceptar
+# Endpoints de la API (comunes a todas las casas del mismo platform)
 API_ENDPOINTS = {
     "1x2": "/service-api/LineFeed/Get1x2_VZip",
     "sports": "/service-api/LineFeed/GetSportsShortZip",
     "express": "/service-api/main-line-feed/v1/expressDay",
-    # Estos endpoints adicionales pueden aparecer al navegar
     "events": "/service-api/LineFeed/GetEventsZip",
     "champs": "/service-api/LineFeed/GetChampsZip",
     "sports_v2": "/service-api/LineFeed/GetSportsWithCountZip",
+}
+
+# Configuración por casa de apuestas (todas usan el mismo backend BetB2B)
+BOOK_CONFIGS = {
+    "1xbet": {
+        "name": "1xBet",
+        "domain_filter": "1xbet",  # para filtrar requests interceptados
+        "football_url": "https://1xbet.com/en/line/football",
+        "league_urls": [
+            "https://1xbet.com/en/line/football/88637-england-premier-league",
+            "https://1xbet.com/en/line/football/127733-spain-laliga",
+            "https://1xbet.com/en/line/football/96463-germany-bundesliga",
+            "https://1xbet.com/en/line/football/110163-italy-serie-a",
+            "https://1xbet.com/en/line/football/12821-france-ligue-1",
+            "https://1xbet.com/en/line/football/118587-uefa-champions-league",
+            "https://1xbet.com/en/line/football/118593-uefa-europa-league",
+        ],
+    },
+    "melbet": {
+        "name": "MelBet",
+        "domain_filter": "melbet",
+        "football_url": "https://melbet.com/en/line/football",
+        "league_urls": [
+            "https://melbet.com/en/line/football/88637-england-premier-league",
+            "https://melbet.com/en/line/football/127733-spain-laliga",
+            "https://melbet.com/en/line/football/96463-germany-bundesliga",
+            "https://melbet.com/en/line/football/110163-italy-serie-a",
+            "https://melbet.com/en/line/football/12821-france-ligue-1",
+            "https://melbet.com/en/line/football/118587-uefa-champions-league",
+            "https://melbet.com/en/line/football/118593-uefa-europa-league",
+        ],
+    },
+    "20bet": {
+        "name": "20Bet",
+        "domain_filter": "20bet",
+        "football_url": "https://20bet.com/en/line/football",
+        "league_urls": [
+            "https://20bet.com/en/line/football/88637-england-premier-league",
+            "https://20bet.com/en/line/football/127733-spain-laliga",
+            "https://20bet.com/en/line/football/96463-germany-bundesliga",
+            "https://20bet.com/en/line/football/110163-italy-serie-a",
+            "https://20bet.com/en/line/football/12821-france-ligue-1",
+            "https://20bet.com/en/line/football/118587-uefa-champions-league",
+            "https://20bet.com/en/line/football/118593-uefa-europa-league",
+        ],
+    },
 }
 
 # Directorio de debug output
@@ -58,11 +97,16 @@ FOOTBALL_SPORT_ID = 1
 # ---------------------------------------------------------------------------
 
 class OneXBetScraper:
-    """Scrapea odds de 1xBet interceptando la API interna cr.1xbet.com."""
+    """Scrapea odds de casas BetB2B (1xBet, MelBet, 20Bet) interceptando su API interna."""
 
-    def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
+    def __init__(self, headless: bool = True, timeout_ms: int = 60_000,
+                 book_key: str = "1xbet"):
         self.headless = headless
         self.timeout_ms = timeout_ms
+        if book_key not in BOOK_CONFIGS:
+            raise ValueError(f"book_key '{book_key}' no válido. Opciones: {list(BOOK_CONFIGS.keys())}")
+        self.book_key = book_key
+        self.book_config = BOOK_CONFIGS[book_key]
 
     def scrape_football_odds(self) -> tuple[dict, list[dict]]:
         """
@@ -89,8 +133,8 @@ class OneXBetScraper:
             domain = parsed.netloc
             path = parsed.path
 
-            # Solo interceptar requests de 1xBet
-            if "1xbet" not in domain:
+            # Solo interceptar requests de esta casa
+            if self.book_config["domain_filter"] not in domain:
                 return
 
             # Capturar respuestas JSON de la API
@@ -128,7 +172,8 @@ class OneXBetScraper:
                     if isinstance(item, dict):
                         self._extract_events_from_body(item, path, all_events)
 
-        logger.info("Iniciando scraping de 1xBet fútbol...")
+        book_name = self.book_config["name"]
+        logger.info(f"Iniciando scraping de {book_name} fútbol...")
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -148,10 +193,11 @@ class OneXBetScraper:
             page.on("response", on_response)
 
             # Navegar a la página de fútbol pre-match
-            logger.info(f"Navegando a {ONEXBET_FOOTBALL_URL}")
+            football_url = self.book_config["football_url"]
+            logger.info(f"Navegando a {football_url}")
             try:
                 page.goto(
-                    ONEXBET_FOOTBALL_URL,
+                    football_url,
                     wait_until="networkidle",
                     timeout=self.timeout_ms,
                 )
@@ -166,15 +212,7 @@ class OneXBetScraper:
                 page.wait_for_timeout(2_000)
 
             # Intentar navegar a ligas específicas populares
-            league_urls = [
-                "https://1xbet.com/en/line/football/88637-england-premier-league",
-                "https://1xbet.com/en/line/football/127733-spain-laliga",
-                "https://1xbet.com/en/line/football/96463-germany-bundesliga",
-                "https://1xbet.com/en/line/football/110163-italy-serie-a",
-                "https://1xbet.com/en/line/football/12821-france-ligue-1",
-                "https://1xbet.com/en/line/football/118587-uefa-champions-league",
-                "https://1xbet.com/en/line/football/118593-uefa-europa-league",
-            ]
+            league_urls = self.book_config["league_urls"]
 
             for league_url in league_urls:
                 logger.info(f"Navegando a {league_url.split('/')[-1]}")
@@ -293,6 +331,8 @@ class OneXBetScraper:
                 "commence_time": parsed["start_time"],
                 "sport_key": "soccer",
                 "sport_title": f"Soccer - {parsed['league']}",
+                "book_key": self.book_key,
+                "book_name": self.book_config["name"],
             })
 
         return soft_odds, events_info

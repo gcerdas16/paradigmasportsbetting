@@ -118,6 +118,17 @@ def find_value_bets(
         if outcome_key not in pinnacle_market:
             continue
 
+        # Sanity check: si las odds difieren >3x, es probablemente un error de datos
+        # (ej: signo de handicap invertido, evento mal emparejado)
+        pinnacle_odds_check = pinnacle_market[outcome_key]
+        odds_ratio = max(book_odds, pinnacle_odds_check) / min(book_odds, pinnacle_odds_check)
+        if odds_ratio > 3.0:
+            logger.debug(
+                f"Odds ratio {odds_ratio:.1f}x descartado: {outcome_key} "
+                f"book={book_odds:.3f} pin={pinnacle_odds_check:.3f}"
+            )
+            continue
+
         # Aplicar filtros básicos
         if book_odds < config.MIN_ODDS_DECIMAL or book_odds > config.MAX_ODDS_DECIMAL:
             continue
