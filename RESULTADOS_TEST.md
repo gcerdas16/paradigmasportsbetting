@@ -35,6 +35,75 @@
 
 ## Entradas
 
+### 2026-04-27 12:50 — verify_odds — FUNCIONA, links 1xBet OK, Pinnacle requiere login
+
+**Comando:** `cd paradigma && python -m scraping.verify_odds`
+**Duración:** ~5 min
+**Exit code:** 0
+
+**Output — primeros 5 partidos:**
+```
+PARTIDOS EMPAREJADOS: 87
+
+#1 Manchester City vs Brentford | England - Premier League
+   🟢 Pinnacle: https://www.pinnacle.com/en/soccer/matchup/1629254630
+   🔵 1xBet:    https://1xbet.com/en/line/football/88637/716170549
+   h2h: Brentford 7.940/8.400 | Draw 6.000/6.150 | Man City 1.308/1.362
+   Totals 3.5: Over Pinnacle 2.030 | 1xBet 2.113
+   Spread ±1.0: Man City Pinnacle 1.442 | 1xBet 1.430
+
+#2 Nottingham Forest vs Newcastle United | England - Premier League
+   🟢 Pinnacle: https://www.pinnacle.com/en/soccer/matchup/1629385719
+   🔵 1xBet:    https://1xbet.com/en/line/football/88637/716170558
+   h2h: Draw 3.420/3.535 | Newcastle 2.810/2.908 | Forest 2.490/2.572
+   Totals 3.0: Over Pinnacle 2.150 | 1xBet 2.130
+   Spread ±1.0: Nottingham Forest Pinnacle 3.950 | 1xBet 3.840
+
+#3 Brighton vs Wolverhampton | England - Premier League
+   🟢 Pinnacle: https://www.pinnacle.com/en/soccer/matchup/1629271809
+   🔵 1xBet:    https://1xbet.com/en/line/football/88637/716170031
+   h2h: Brighton 1.338/1.393 | Draw 5.460/5.590 | Wolves 7.890/8.400
+   Totals 3.5: Over Pinnacle 2.370 | 1xBet 2.447
+
+#4 Bournemouth vs Crystal Palace | England - Premier League
+   🟢 Pinnacle: https://www.pinnacle.com/en/soccer/matchup/1628649353
+   🔵 1xBet:    https://1xbet.com/en/line/football/88637/715078915
+   h2h: Bournemouth 1.654/1.707 | C. Palace 4.950/4.980 | Draw 4.350/4.370
+   Totals 3.0: Over Pinnacle 2.160 | 1xBet 2.100
+   Spread ±1.0: Bournemouth Pinnacle 2.160 | 1xBet 2.110
+
+#5 Crystal Palace vs Everton | England - Premier League
+   🟢 Pinnacle: https://www.pinnacle.com/en/soccer/matchup/1629385715
+   🔵 1xBet:    https://1xbet.com/en/line/football/88637/716180130
+   h2h: C. Palace 2.730/2.846 | Draw 3.200/3.250 | Everton 2.700/2.805
+   Totals 2.5: Over Pinnacle 2.050 | 1xBet 2.096
+   Spread ±1.0: Crystal Palace Pinnacle 4.510 | 1xBet 4.450
+```
+
+**Verificación de links:**
+- 🔵 **1xBet links: FUNCIONAN** — el formato `football/{league_id}/{event_id}` lleva directamente al partido correcto
+- 🟢 **Pinnacle links: NO FUNCIONAN para verificación visual** — `https://www.pinnacle.com/en/soccer/matchup/{id}` redirige al homepage. Pinnacle requiere login para ver páginas de partidos específicos. No es un bug del scraper — las odds se obtienen de la API interna, no de la página pública.
+
+**Warning (no bloqueante):**
+```
+[WARNING] Error en england-premier-league/matchups/: Page.goto: Timeout 60000ms exceeded.
+```
+Normal — EPL siempre timeout en la navegación directa, pero los datos se obtienen igualmente vía la API interceptada.
+
+**⚠️ Anomalía detectada — spread Sunderland:**
+```
+#13 Sunderland vs Manchester United
+    Spread ±1.0: Sunderland Pinnacle 1.493 | 1xBet 7.600
+```
+Diferencia de 5x — claramente un mapping errado. Pinnacle tiene Sunderland -1.0 (favorito dando handicap) y 1xBet tiene Sunderland +1.0 (recibiendo handicap). El signo del handicap está invertido para este partido.
+
+**Observaciones:**
+- Las odds h2h y totals se ven correctas y en escala normal (diferencias de 2-5% entre casas, consistente con margen de 1xBet)
+- El spread de Sunderland es el único caso detectado con valor claramente anómalo — investigar si el signo del handicap de Pinnacle vs 1xBet está invertido en algunos casos
+- El scraper funciona correctamente para verificación; la única limitación es que Pinnacle requiere cuenta para ver páginas de partidos específicos
+
+---
+
 ### 2026-04-27 12:32 — verify_odds — ERROR al iniciar
 
 **Comando:** `cd paradigma && python -m scraping.verify_odds`
