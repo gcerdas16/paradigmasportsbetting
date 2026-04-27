@@ -35,6 +35,45 @@
 
 ## Entradas
 
+### 2026-04-27 11:59 — Diagnóstico totals/spreads + fix spread names
+
+**Comando:** `cd paradigma && python -m scraping.scanner_v2`
+**Duración:** ~4 min
+**Exit code:** 0
+
+**Output — sección clave (Por mercado):**
+```
+Por mercado (1xBet → matched en Pinnacle):
+  h2h:     264 odds, 194 matched   ✅
+  spreads: 698 odds,  14 matched   ⚠️ MUY BAJO
+  totals:  872 odds,  86 matched   ⚠️ BAJO
+```
+
+**Value bets:** 0 (ninguna supera EV 5%)
+
+**Near misses (EV 1-5%):** 8 — todos h2h, ninguno en totals/spreads
+```
+[h2h] Leeds United vs Burnley        | Burnley @ 7.700  (Pin: 6.83) | EV: +4.41%
+[h2h] Union Berlin vs FC Koln        | Draw @ 3.595     (Pin: 3.36) | EV: +3.03%
+[h2h] Brentford vs West Ham United   | West Ham @ 3.775 (Pin: 3.53) | EV: +2.74%
+[h2h] Lecce vs Juventus              | Juventus @ 1.628 (Pin: 1.54) | EV: +2.14%
+[h2h] Lazio vs Udinese               | Lazio @ 2.317    (Pin: 2.22) | EV: +1.95%
+[h2h] Arsenal vs Fulham              | Arsenal @ 1.495  (Pin: 1.44) | EV: +1.40%
+[h2h] Hellas Verona vs Como          | Como @ 1.514     (Pin: 1.44) | EV: +1.35%
+[h2h] Real Betis vs Real Oviedo      | Real Betis @ 1.656(Pin: 1.60)| EV: +1.30%
+Por mercado: {'h2h': 8}
+```
+
+**Diagnóstico:**
+- `spreads: 14 matched de 698` → solo ~2% de líneas casan. El punto de handicap de 1xBet y Pinnacle difieren en formato o valor.
+- `totals: 86 matched de 872` → ~10%. Algunos pares Over/Under casan, pero la mayoría no.
+- `h2h: 194 matched de 264` → ~73%. Funciona bien.
+- El near-miss de totals/spreads = 0 confirma: o no están casando o el devig por línea no produce resultados válidos.
+
+**Observaciones:** Prioridad: investigar por qué spreads solo matchea 14/698. Probablemente los puntos de handicap tienen formato diferente (ej: Pinnacle usa `1.25` y 1xBet usa `1.0`/`1.5` separados).
+
+---
+
 ### 2026-04-27 11:49 — Scanner v2 con near-misses
 
 **Comando:** `cd paradigma && python -m scraping.scanner_v2`
