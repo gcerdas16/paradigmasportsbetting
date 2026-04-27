@@ -35,6 +35,69 @@
 
 ## Entradas
 
+### 2026-04-27 12:08 — Diagnóstico profundo: mismatch keys totals/spreads
+
+**Comando:** `cd paradigma && python -m scraping.scanner_v2`
+**Duración:** ~4 min
+**Exit code:** 0
+
+**Por mercado:**
+```
+h2h:     264 odds, 194 matched
+spreads: 698 odds,  12 matched
+totals:  872 odds,  88 matched
+```
+
+**🔍 totals MISMATCH [Manchester United vs Liverpool]:**
+```
+1xBet key:     ('Over', 3.5)   (type: str, float)
+Pinnacle keys: [('Over', 3.25), ('Under', 3.25)]
+
+1xBet key:     ('Under', 3.5)  (type: str, float)
+Pinnacle keys: [('Over', 3.25), ('Under', 3.25)]
+
+1xBet key:     ('Over', 2.5)   (type: str, float)
+Pinnacle keys: [('Over', 3.25), ('Under', 3.25)]
+```
+
+**🔍 spreads MISMATCH [Manchester United vs Liverpool]:**
+```
+1xBet key:     ('Manchester United', -1.0)  (type: str, float)
+Pinnacle keys: [('Manchester United', 0.0), ('Liverpool', -0.0)]
+
+1xBet key:     ('Liverpool', -1.0)          (type: str, float)
+Pinnacle keys: [('Manchester United', 0.0), ('Liverpool', -0.0)]
+
+1xBet key:     ('Manchester United', 1.0)   (type: str, float)
+Pinnacle keys: [('Manchester United', 0.0), ('Liverpool', -0.0)]
+```
+
+**Diagnóstico:**
+- **totals**: tipos OK (str, float en ambos lados). El problema es que los PUNTOS no coinciden. 1xBet tiene Over 2.5, Over 3.5; Pinnacle tiene Over 3.25. Pinnacle usa líneas asiáticas (cuartos: 2.75, 3.25) mientras 1xBet usa enteros/medios (2.5, 3.0, 3.5).
+- **spreads**: mismo problema. 1xBet tiene (-1.0, 1.0, -1.5, 1.5). Pinnacle tiene (0.0, -0.0) que es un handicap asiático de 0 (empate asiático). Las líneas no se solapan.
+
+**Value bet detectada:**
+```
+#1 [h2h] Tottenham Hotspur vs Leeds United
+   Tottenham @ 2.237 (1xBet) vs Pinnacle 2.04
+   EV: +5.45% | Kelly: 1.10%
+```
+
+**Near misses (7, todos h2h):**
+```
+Leeds vs Burnley        | Burnley @ 7.700  (Pin: 6.83) | EV: +4.41%
+Union Berlin vs FC Koln | Draw @ 3.595     (Pin: 3.36) | EV: +3.03%
+Brentford vs West Ham   | West Ham @ 3.775 (Pin: 3.53) | EV: +2.74%
+Lecce vs Juventus       | Juventus @ 1.628 (Pin: 1.54) | EV: +2.14%
+Arsenal vs Fulham       | Arsenal @ 1.495  (Pin: 1.44) | EV: +1.40%
+Hellas Verona vs Como   | Como @ 1.514     (Pin: 1.44) | EV: +1.35%
+Real Betis vs Oviedo    | Real Betis @ 1.656(Pin: 1.60)| EV: +1.30%
+```
+
+**Observaciones:** El problema de totals/spreads es de PUNTOS, no de tipos. Pinnacle usa líneas asiáticas (cuartos: 3.25, 2.75) mientras 1xBet usa líneas occidentales (enteros y medios: 2.5, 3.0, 3.5). Para spreads, Pinnacle muestra el handicap neto mientras 1xBet muestra los dos lados por separado con signo. Fix: mapear líneas asiáticas de Pinnacle al punto occidental más cercano, o filtrar solo las líneas que existen en ambos.
+
+---
+
 ### 2026-04-27 11:59 — Diagnóstico totals/spreads + fix spread names
 
 **Comando:** `cd paradigma && python -m scraping.scanner_v2`
