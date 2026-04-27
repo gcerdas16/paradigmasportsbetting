@@ -26,20 +26,17 @@ logger = logging.getLogger(__name__)
 SITES = {
     "bet365": {
         "name": "bet365",
-        "start_url": "https://www.bet365.com/#/AS/B1/",
+        "start_url": "https://www.bet365.com/#/AS/B1/K%5E5/",
         "football_urls": [
-            "https://www.bet365.com/#/AS/B1/",  # Football main
+            "https://www.bet365.com/#/AS/B1/K%5E5/",
         ],
         "domain_hints": ["bet365"],
     },
     "doradobet": {
         "name": "DoradoBet",
-        "start_url": "https://www.doradobet.com/",
+        "start_url": "https://doradobet.com/deportes/66",
         "football_urls": [
-            "https://www.doradobet.com/sportsbook/football",
-            "https://www.doradobet.com/sports/football",
-            "https://www.doradobet.com/en/sports/football",
-            "https://www.doradobet.com/",
+            "https://doradobet.com/deportes/66",
         ],
         "domain_hints": ["doradobet"],
     },

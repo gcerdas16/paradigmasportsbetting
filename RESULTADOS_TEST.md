@@ -119,9 +119,33 @@ Dominio principal: platform.20bet.com
 - DoradoBet fútbol: `https://doradobet.com/deportes/66`
 - bet365 fútbol: `https://www.bet365.com/#/AS/B1/K%5E5/`
 
-Hay que correr el sniffer de nuevo con estas URLs para capturar las APIs de odds correctamente.
+**Segunda corrida con URLs correctas:**
 
-**Observaciones:** MelBet es la incorporación más fácil — mismo API que 1xBet. Para DoradoBet hay que encontrar la URL correcta manualmente. bet365 requiere ingeniería inversa del protocolo binario. 20Bet requiere análisis adicional del endpoint `sport/list`.
+**DoradoBet (segunda corrida)** ✅
+```
+Requests: 122 | Datos: 5795.1 KB | JSON: 40
+Backend: Altenar (sb2frontend-altenar2.biahosted.com)
+```
+- Página cargó correctamente con la URL `/deportes/66`
+- **Endpoints de odds detectados:**
+  ```
+  sb2frontend-altenar2.biahosted.com/api/widget/GetUpcoming (59 KB)
+  → keys: ['markets', 'odds', 'events', 'sports']  ← pre-match odds aquí
+  sb2frontend-altenar2.biahosted.com/api/widget/GetLivenow  (42 KB)
+  → keys: ['markets', 'odds', 'events', 'sports']  ← live odds aquí
+  sb2frontend-altenar2.biahosted.com/api/Widget/GetWidgetsConfiguration (1113 KB)
+  ```
+- **Conclusión: DoradoBet usa plataforma Altenar. Las odds están en `GetUpcoming` y `GetLivenow`. API JSON limpio y estructurado.**
+
+**bet365 (segunda corrida)** ❌
+```
+Requests: 15 | Datos: 4499.7 KB | JSON: 5 (idéntico a primera corrida)
+```
+- Resultado idéntico — el protocolo binario `Api/1/Blob` es arquitectural, no depende de la URL
+- No hay JSON de odds disponible sin ingeniería inversa del OCP binario
+- **Conclusión: bet365 no es scrappeable con este approach**
+
+**Observaciones:** MelBet es la incorporación más fácil — mismo API que 1xBet. DoradoBet usa Altenar con API JSON limpio — scrappeable. bet365 usa protocolo binario propietario — no viable sin ingeniería inversa. 20Bet requiere análisis adicional del endpoint `sport/list`.
 
 ---
 
