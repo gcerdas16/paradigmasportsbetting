@@ -385,14 +385,15 @@ class PinnacleScraper:
             if tot_rows:
                 totals_odds = {}
                 for row in tot_rows:
-                    if row.get("isAlternate", False):
-                        continue  # Solo main line para compatibilidad
+                    # Incluir TODAS las líneas (main + alternativas)
+                    # para maximizar matching con 1xBet
                     for price in row.get("prices", []):
                         des = price.get("designation", "")
                         pts = price.get("points")
                         american = price.get("price")
                         if american is None or pts is None:
                             continue
+                        pts = float(pts)
                         decimal = american_to_decimal(american)
                         if des == "over":
                             totals_odds[("Over", pts)] = decimal
@@ -406,14 +407,14 @@ class PinnacleScraper:
             if sp_rows:
                 spreads_odds = {}
                 for row in sp_rows:
-                    if row.get("isAlternate", False):
-                        continue
+                    # Incluir TODAS las líneas (main + alternativas)
                     for price in row.get("prices", []):
                         des = price.get("designation", "")
                         pts = price.get("points")
                         american = price.get("price")
                         if american is None or pts is None:
                             continue
+                        pts = float(pts)
                         decimal = american_to_decimal(american)
                         if des == "home":
                             spreads_odds[(home, pts)] = decimal

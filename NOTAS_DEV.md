@@ -32,7 +32,33 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 12:01 — Diagnóstico profundo: por qué totals/spreads no matchean
+### 🔴 2026-04-27 12:13 — FIX: Pinnacle ahora incluye TODAS las líneas
+
+**Qué cambió:**
+1. **pinnacle_scraper.py**: Removido filtro `isAlternate` para totals y spreads. Ahora captura TODAS las líneas (2.5, 2.75, 3.0, 3.25, 3.5...) en vez de solo la main line
+2. **pinnacle_scraper.py**: Forzado `pts = float(pts)` para garantizar coincidencia de tipos con 1xBet
+
+**Causa del bug:** Pinnacle solo guardaba 1 línea (ej: Over 3.25). 1xBet tiene muchas líneas (Over 2.5, 3.0, 3.5). Como 3.25 no existe en 1xBet, nunca matcheaban. Ahora Pinnacle tendrá también 2.5, 3.0, 3.5 → match rate debería subir de 10% a 60%+.
+
+**Comando:**
+```bash
+cd paradigmasportsbetting
+git pull
+cd paradigma
+python -m scraping.scanner_v2
+```
+
+**Qué buscar en el output:**
+1. `totals: X odds, Y matched` — esperamos Y >> 88 (antes)
+2. `spreads: X odds, Y matched` — esperamos Y >> 12 (antes)
+3. Near misses en totals/spreads (antes era 0)
+4. ¿Más value bets?
+
+**Pegar en RESULTADOS_TEST.md:** sección "Por mercado", value bets, near misses, y cualquier MISMATCH si aún aparecen.
+
+---
+
+### ✅ 2026-04-27 12:01 — Diagnóstico profundo: por qué totals/spreads no matchean
 
 **Qué cambió:**
 1. **scanner_v2.py**: Nuevo log detallado que muestra las keys EXACTAS que no matchean, con tipos de datos. Ejemplo esperado:
