@@ -1,0 +1,27 @@
+# Repos clonados (muy pesados, no subir)
+repos/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Debug/output
+scraping_debug/
+diagnostico_data/
+*.log
+
+# PDF generados
+*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# DB
+*.db
