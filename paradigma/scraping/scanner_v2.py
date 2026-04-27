@@ -144,12 +144,16 @@ def scan_once(headless: bool = True) -> list:
         f"   | 1xBet: {len(soft_book_rows)} odds individuales"
     )
 
-    # Calcular value bets
-    value_bets = find_value_bets(soft_book_rows, unified_pinnacle)
+    # Calcular value bets con umbral bajo para capturar near-misses
+    real_threshold = config.MIN_EV_PERCENT
+    original = config.MIN_EV_PERCENT
+    config.MIN_EV_PERCENT = 1.0  # Capturar todo con EV > 1%
+    all_bets = find_value_bets(soft_book_rows, unified_pinnacle)
+    config.MIN_EV_PERCENT = original  # Restaurar
 
     # Filtro de seguridad: EV > 30% es casi seguro un error de emparejamiento
     MAX_SANE_EV = 30.0
-    suspicious = [vb for vb in value_bets if vb.ev_percent > MAX_SANE_EV]
+    suspicious = [vb for vb in all_bets if vb.ev_percent > MAX_SANE_EV]
     if suspicious:
         logger.warning(
             f"   ⚠️ {len(suspicious)} bets con EV > {MAX_SANE_EV}% descartadas "
@@ -160,9 +164,13 @@ def scan_once(headless: bool = True) -> list:
                 f"     {vb.home_team} vs {vb.away_team} | "
                 f"{vb.outcome_name} @ {vb.odds:.2f} | EV: {vb.ev_percent:.1f}%"
             )
-    value_bets = [vb for vb in value_bets if vb.ev_percent <= MAX_SANE_EV]
+    all_bets = [vb for vb in all_bets if vb.ev_percent <= MAX_SANE_EV]
 
-    # Deduplicar: mejor odd por outcome
+    # Separar: value bets reales vs near-misses
+    value_bets = [vb for vb in all_bets if vb.ev_percent >= real_threshold]
+    near_misses = [vb for vb in all_bets if vb.ev_percent < real_threshold]
+
+    # Deduplicar value bets
     best_per_outcome: dict[str, object] = {}
     for vb in value_bets:
         key = f"{vb.event_id}|{vb.market}|{vb.outcome_name}|{vb.outcome_point}"
@@ -170,10 +178,18 @@ def scan_once(headless: bool = True) -> list:
             best_per_outcome[key] = vb
     value_bets = sorted(best_per_outcome.values(), key=lambda x: x.ev_percent, reverse=True)
 
-    return value_bets
+    # Deduplicar near-misses
+    best_nm: dict[str, object] = {}
+    for vb in near_misses:
+        key = f"{vb.event_id}|{vb.market}|{vb.outcome_name}|{vb.outcome_point}"
+        if key not in best_nm or vb.odds > best_nm[key].odds:
+            best_nm[key] = vb
+    near_misses = sorted(best_nm.values(), key=lambda x: x.ev_percent, reverse=True)[:15]
+
+    return value_bets, near_misses
 
 
-def print_results(value_bets: list):
+def print_results(value_bets: list, near_misses: list = None):
     """Imprime los resultados de forma legible."""
     print(f"\n{'='*70}")
     print(f"🎯 VALUE BETS ENCONTRADAS: {len(value_bets)}")
@@ -182,33 +198,49 @@ def print_results(value_bets: list):
     if not value_bets:
         print("  (ninguna — las odds actuales no superan el umbral de EV)")
         print(f"  Umbral configurado: EV > {config.MIN_EV_PERCENT}%")
-        return
+    else:
+        for i, vb in enumerate(value_bets, 1):
+            pt_str = f" {vb.outcome_point}" if vb.outcome_point is not None else ""
+            pin_str = f" (Pinnacle: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
 
-    for i, vb in enumerate(value_bets, 1):
-        pt_str = f" {vb.outcome_point}" if vb.outcome_point is not None else ""
-        pin_str = f" (Pinnacle: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
+            print(f"\n  #{i} [{vb.market}] {vb.home_team} vs {vb.away_team}")
+            print(f"     Liga: {vb.sport_title}")
+            print(f"     Apuesta: {vb.outcome_name}{pt_str} @ {vb.odds:.3f} ({vb.book_title}){pin_str}")
+            print(f"     EV: {vb.ev_percent:+.2f}%  |  Kelly: {vb.kelly_stake_percent:.2f}%")
+            print(f"     Fair prob: {vb.fair_prob:.4f}")
 
-        print(f"\n  #{i} [{vb.market}] {vb.home_team} vs {vb.away_team}")
-        print(f"     Liga: {vb.sport_title}")
-        print(f"     Apuesta: {vb.outcome_name}{pt_str} @ {vb.odds:.3f} ({vb.book_title}){pin_str}")
-        print(f"     EV: {vb.ev_percent:+.2f}%  |  Kelly: {vb.kelly_stake_percent:.2f}%")
-        print(f"     Fair prob: {vb.fair_prob:.4f}")
+        avg_ev = sum(vb.ev_percent for vb in value_bets) / len(value_bets)
+        avg_kelly = sum(vb.kelly_stake_percent for vb in value_bets) / len(value_bets)
+        markets = {}
+        for vb in value_bets:
+            markets[vb.market] = markets.get(vb.market, 0) + 1
 
-    # Resumen
-    avg_ev = sum(vb.ev_percent for vb in value_bets) / len(value_bets)
-    avg_kelly = sum(vb.kelly_stake_percent for vb in value_bets) / len(value_bets)
-    markets = {}
-    for vb in value_bets:
-        markets[vb.market] = markets.get(vb.market, 0) + 1
+        print(f"\n{'─'*70}")
+        print(f"  Resumen:")
+        print(f"    Total: {len(value_bets)} value bets")
+        print(f"    EV promedio: {avg_ev:+.2f}%")
+        print(f"    Kelly promedio: {avg_kelly:.2f}%")
+        print(f"    Por mercado: {markets}")
+        print(f"    Fuente: Pinnacle (scraping) vs 1xBet (scraping)")
+        print(f"    Costo: $0")
 
-    print(f"\n{'─'*70}")
-    print(f"  Resumen:")
-    print(f"    Total: {len(value_bets)} value bets")
-    print(f"    EV promedio: {avg_ev:+.2f}%")
-    print(f"    Kelly promedio: {avg_kelly:.2f}%")
-    print(f"    Por mercado: {markets}")
-    print(f"    Fuente: Pinnacle (scraping) vs 1xBet (scraping)")
-    print(f"    Costo: $0")
+    # Near-misses: diagnóstico de oportunidades cercanas
+    if near_misses:
+        print(f"\n{'='*70}")
+        print(f"🔍 NEAR MISSES (EV 1-{config.MIN_EV_PERCENT}%): {len(near_misses)}")
+        print(f"{'='*70}")
+        for vb in near_misses[:15]:
+            pt_str = f" {vb.outcome_point}" if vb.outcome_point is not None else ""
+            pin_str = f" (Pin: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
+            print(
+                f"  [{vb.market:>7}] {vb.home_team} vs {vb.away_team} | "
+                f"{vb.outcome_name}{pt_str} @ {vb.odds:.3f}{pin_str} | "
+                f"EV: {vb.ev_percent:+.2f}%"
+            )
+        nm_markets = {}
+        for vb in near_misses:
+            nm_markets[vb.market] = nm_markets.get(vb.market, 0) + 1
+        print(f"  Por mercado: {nm_markets}")
 
 
 # ---------------------------------------------------------------------------
@@ -226,5 +258,5 @@ if __name__ == "__main__":
     print(f"   Kelly: ÷{int(1/config.KELLY_FRACTION)}, cap {config.MAX_KELLY_PERCENT}%")
     print(f"   Modo: {'PAPER' if config.PAPER_TRADING else 'REAL'}")
 
-    value_bets = scan_once(headless=True)
-    print_results(value_bets)
+    value_bets, near_misses = scan_once(headless=True)
+    print_results(value_bets, near_misses)
