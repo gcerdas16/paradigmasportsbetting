@@ -289,10 +289,30 @@ El scraper produce exactamente el mismo formato que `OddsClient`:
 - `events_info`: lista de dicts con `event_id, home_team, away_team, league, commence_time`
 - **Puede reemplazar directamente** `extract_pinnacle_odds()` sin cambiar `ev_calculator.py`
 
-### Siguiente: Soft book scrapers
-- TODO: 1xBet scraper (basado en repos/sports-arbitrage-1xbet)
-- TODO: Integrar soft odds con `scraping_client.py`
-- Mientras tanto, The Odds API sigue funcionando para soft books
+### 1xBet Scraper ✅ (2026-04-27)
+- **Archivo**: `scraping/onexbet_scraper.py`
+- **API**: `cr.1xbet.com/service-api/LineFeed/Get1x2_VZip`
+- **155 eventos** con odds, 320 detectados en bruto, 37 API responses
+- **Mercados**: h2h (1X2), totals (múltiples líneas), spreads (Asian HC)
+- **Ligas**: EPL, La Liga, Bundesliga, Serie A, Ligue 1, UCL, UEL, Argentina, Brasil, CR, etc.
+- **Estructura JSON**: `Value[].{O1, O2, I, LE, E[{C,G,T,P}], AE[{G, ME[...]}]}`
+- **T mapping**: 1=Home, 2=Draw, 3=Away, 7=HC Home, 8=HC Away, 9=Over, 10=Under
+
+### Scanner v2 — Pipeline completo ✅ (2026-04-27)
+- **Archivo**: `scraping/scanner_v2.py`
+- **Flujo**: Pinnacle scrape → 1xBet scrape → match eventos → calcular EV
+- **Event matcher** (`scraping/event_matcher.py`): fuzzy matching por nombre + verificación de liga
+- **Costo: $0** (vs $60/mes de The Odds API)
+- **Resultados**: 94 partidos emparejados, 1,978 odds analizadas, value bets detectadas
+- **Protecciones**: EV cap >30% (descarta falsos positivos por mismatch)
+
+### Archivos nuevos del módulo scraping
+| Archivo | Función |
+|---------|---------|
+| `scraping/onexbet_scraper.py` | Scraper 1xBet interceptando API interna |
+| `scraping/event_matcher.py` | Fuzzy matching entre Pinnacle y soft books |
+| `scraping/scanner_v2.py` | Pipeline completo: scrape → match → EV calc |
+| `scraping/test_1xbet_deep.py` | Diagnóstico de estructura API 1xBet |
 
 ---
 
