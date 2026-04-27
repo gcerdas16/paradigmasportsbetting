@@ -19,6 +19,26 @@ import sys
 import os
 from datetime import datetime, timezone
 
+
+def format_match_time(commence_time) -> str:
+    """Convierte commence_time (ISO string o Unix timestamp) a texto legible."""
+    if not commence_time:
+        return ""
+    try:
+        t = commence_time
+        if isinstance(t, (int, float)):
+            dt = datetime.fromtimestamp(float(t), tz=timezone.utc)
+        elif isinstance(t, str) and t.isdigit():
+            dt = datetime.fromtimestamp(float(t), tz=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+        days = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        return f"{days[dt.weekday()]} {dt.day:02d} {months[dt.month-1]} — {dt.hour:02d}:{dt.minute:02d} UTC"
+    except Exception:
+        return str(commence_time)
+
 # Agregar el directorio padre al path para importar módulos de paradigma
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -253,6 +273,9 @@ def print_results(value_bets: list, near_misses: list = None):
             pin_str = f" (Pinnacle: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
 
             print(f"\n  #{i} [{vb.market}] {vb.home_team} vs {vb.away_team}")
+            match_time = format_match_time(vb.commence_time)
+            if match_time:
+                print(f"     📅 {match_time}")
             print(f"     Liga: {vb.sport_title}")
             print(f"     Apuesta: {vb.outcome_name}{pt_str} @ {vb.odds:.3f} ({vb.book_title}){pin_str}")
             print(f"     EV: {vb.ev_percent:+.2f}%  |  Kelly: {vb.kelly_stake_percent:.2f}%")
@@ -281,8 +304,10 @@ def print_results(value_bets: list, near_misses: list = None):
         for vb in near_misses[:15]:
             pt_str = f" {vb.outcome_point}" if vb.outcome_point is not None else ""
             pin_str = f" (Pin: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
+            time_str = format_match_time(vb.commence_time)
+            time_part = f" [{time_str}]" if time_str else ""
             print(
-                f"  [{vb.market:>7}] {vb.home_team} vs {vb.away_team} | "
+                f"  [{vb.market:>7}] {vb.home_team} vs {vb.away_team}{time_part} | "
                 f"{vb.outcome_name}{pt_str} @ {vb.odds:.3f}{pin_str} | "
                 f"EV: {vb.ev_percent:+.2f}%"
             )

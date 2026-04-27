@@ -12,6 +12,7 @@ Uso:
 import sys
 import os
 import logging
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -20,6 +21,25 @@ from scraping.onexbet_scraper import OneXBetScraper
 from scraping.event_matcher import match_events
 
 logger = logging.getLogger(__name__)
+
+
+def format_match_time(commence_time) -> str:
+    if not commence_time:
+        return ""
+    try:
+        t = commence_time
+        if isinstance(t, (int, float)):
+            dt = datetime.fromtimestamp(float(t), tz=timezone.utc)
+        elif isinstance(t, str) and t.isdigit():
+            dt = datetime.fromtimestamp(float(t), tz=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+        days = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        return f"{days[dt.weekday()]} {dt.day:02d} {months[dt.month-1]} — {dt.hour:02d}:{dt.minute:02d} UTC"
+    except Exception:
+        return str(commence_time)
 
 
 def build_1xbet_link(event_id: str, league_id: str = "") -> str:
@@ -76,7 +96,9 @@ def verify():
         xbet_link = build_1xbet_link(s_eid, str(s_info.get("league_id", "")))
 
         print(f"  {'─' * 76}")
-        print(f"  #{i} {home} vs {away}")
+        match_time = format_match_time(p_evt.get("commence_time", ""))
+        time_str = f"  📅 {match_time}" if match_time else ""
+        print(f"  #{i} {home} vs {away}{time_str}")
         print(f"     Liga: {league}")
         print(f"     🟢 Pinnacle: {pin_link}")
         print(f"     🔵 1xBet:    {xbet_link}")
