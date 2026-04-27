@@ -125,6 +125,46 @@ def names_match(name_a: str, name_b: str) -> bool:
     return False
 
 
+def normalize_league(league: str) -> str:
+    """Normaliza un nombre de liga para comparación."""
+    s = league.lower().strip()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    # Quitar puntuación
+    s = re.sub(r"['.\-]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def leagues_compatible(league_a: str, league_b: str) -> bool:
+    """Verifica si dos ligas son compatibles (mismo país/competición).
+
+    Pinnacle: "England - Premier League"
+    1xBet:   "England. Premier League"
+
+    Ambas deben compartir palabras clave de país + competición.
+    """
+    if not league_a or not league_b:
+        return True  # Sin info de liga, no filtrar
+
+    a = normalize_league(league_a)
+    b = normalize_league(league_b)
+
+    if a == b:
+        return True
+
+    # Extraer palabras significativas (>2 chars)
+    words_a = {w for w in a.split() if len(w) > 2}
+    words_b = {w for w in b.split() if len(w) > 2}
+
+    if not words_a or not words_b:
+        return True
+
+    # Deben compartir al menos 2 palabras (país + competición)
+    overlap = words_a & words_b
+    return len(overlap) >= 2
+
+
 def match_events(
     pinnacle_events: list[dict],
     soft_events: list[dict],
@@ -141,10 +181,12 @@ def match_events(
     """
     matched = []
     used_soft = set()
+    rejected_league = 0
 
     for p_evt in pinnacle_events:
         p_home = p_evt["home_team"]
         p_away = p_evt["away_team"]
+        p_league = p_evt.get("league", "")
 
         best_match = None
         best_score = 0
@@ -155,6 +197,7 @@ def match_events(
 
             s_home = s_evt["home_team"]
             s_away = s_evt["away_team"]
+            s_league = s_evt.get("league", "")
 
             # Verificar que ambos equipos coinciden
             home_ok = names_match(p_home, s_home)
@@ -162,19 +205,15 @@ def match_events(
 
             if home_ok and away_ok:
                 score = 2
-            elif home_ok or away_ok:
-                # Un solo equipo coincide — verificar el otro con más flexibilidad
-                # Podría ser home/away invertido
-                if names_match(p_home, s_away) and names_match(p_away, s_home):
-                    score = 2  # Equipos invertidos
-                else:
-                    score = 1
+            elif names_match(p_home, s_away) and names_match(p_away, s_home):
+                score = 2  # Equipos invertidos
             else:
-                # Intentar match invertido (home↔away)
-                if names_match(p_home, s_away) and names_match(p_away, s_home):
-                    score = 2
-                else:
-                    continue
+                continue
+
+            # Verificar liga compatible (evita emparejar EPL con Copa)
+            if not leagues_compatible(p_league, s_league):
+                rejected_league += 1
+                continue
 
             if score > best_score:
                 best_score = score
@@ -184,9 +223,22 @@ def match_events(
             used_soft.add(best_match)
             matched.append((p_evt, soft_events[best_match]))
 
+    if rejected_league:
+        logger.info(f"  Rechazados por liga incompatible: {rejected_league}")
+
     logger.info(
         f"Event matching: {len(matched)} emparejados "
         f"de {len(pinnacle_events)} Pinnacle / {len(soft_events)} soft"
     )
+
+    # Log primeros 10 pares para verificación
+    for p_evt, s_evt in matched[:10]:
+        logger.info(
+            f"  ✔ [{p_evt.get('league','')}] "
+            f"{p_evt['home_team']} vs {p_evt['away_team']}  ↔  "
+            f"{s_evt['home_team']} vs {s_evt['away_team']}"
+        )
+    if len(matched) > 10:
+        logger.info(f"  ... y {len(matched) - 10} más")
 
     return matched

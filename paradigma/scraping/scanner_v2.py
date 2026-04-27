@@ -147,6 +147,21 @@ def scan_once(headless: bool = True) -> list:
     # Calcular value bets
     value_bets = find_value_bets(soft_book_rows, unified_pinnacle)
 
+    # Filtro de seguridad: EV > 30% es casi seguro un error de emparejamiento
+    MAX_SANE_EV = 30.0
+    suspicious = [vb for vb in value_bets if vb.ev_percent > MAX_SANE_EV]
+    if suspicious:
+        logger.warning(
+            f"   ⚠️ {len(suspicious)} bets con EV > {MAX_SANE_EV}% descartadas "
+            f"(probable error de emparejamiento):"
+        )
+        for vb in suspicious:
+            logger.warning(
+                f"     {vb.home_team} vs {vb.away_team} | "
+                f"{vb.outcome_name} @ {vb.odds:.2f} | EV: {vb.ev_percent:.1f}%"
+            )
+    value_bets = [vb for vb in value_bets if vb.ev_percent <= MAX_SANE_EV]
+
     # Deduplicar: mejor odd por outcome
     best_per_outcome: dict[str, object] = {}
     for vb in value_bets:
