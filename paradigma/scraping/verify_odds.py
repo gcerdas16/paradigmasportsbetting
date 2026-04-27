@@ -45,7 +45,7 @@ def verify():
     pinnacle_data, pin_events = pin_scraper.scrape_all_football()
 
     xbet_scraper = OneXBetScraper(headless=True)
-    onexbet_data, xbet_events = xbet_scraper.scrape_all_football()
+    onexbet_data, xbet_events = xbet_scraper.scrape_football_odds()
 
     # Solo eventos con odds
     pin_with_odds = [e for e in pin_events if e["event_id"] in pinnacle_data]
