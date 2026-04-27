@@ -70,17 +70,31 @@ def scan_once(headless: bool = True) -> list:
 
     # ── 3. Emparejar eventos ────────────────────────────────────
     logger.info("\n🔗 Paso 3/4: Emparejando eventos Pinnacle ↔ 1xBet...")
-    matched = match_events(pinnacle_events, onexbet_events)
+
+    # CRÍTICO: Solo emparejar eventos que TIENEN odds.
+    # events_info incluye todos los matchups; pinnacle_data/onexbet_data
+    # solo tienen los que tienen odds reales.
+    pin_events_with_odds = [
+        evt for evt in pinnacle_events if evt["event_id"] in pinnacle_data
+    ]
+    xbet_events_with_odds = [
+        evt for evt in onexbet_events if evt["event_id"] in onexbet_data
+    ]
+    logger.info(
+        f"   Con odds: {len(pin_events_with_odds)} Pinnacle, "
+        f"{len(xbet_events_with_odds)} 1xBet"
+    )
+
+    matched = match_events(pin_events_with_odds, xbet_events_with_odds)
     logger.info(f"   Emparejados: {len(matched)} partidos")
 
     if not matched:
         logger.warning("No se emparejó ningún evento. Verificar nombres.")
-        # Mostrar ejemplos para debug
         logger.info("Ejemplos Pinnacle:")
-        for evt in pinnacle_events[:5]:
+        for evt in pin_events_with_odds[:5]:
             logger.info(f"   {evt['home_team']} vs {evt['away_team']}")
         logger.info("Ejemplos 1xBet:")
-        for evt in onexbet_events[:5]:
+        for evt in xbet_events_with_odds[:5]:
             logger.info(f"   {evt['home_team']} vs {evt['away_team']}")
         return []
 
