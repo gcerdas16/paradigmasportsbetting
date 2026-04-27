@@ -149,6 +149,48 @@ Requests: 15 | Datos: 4499.7 KB | JSON: 5 (idéntico a primera corrida)
 
 ---
 
+### 2026-04-27 17:39 — Scanner combinado: 1xBet + MelBet + DoradoBet — 1 VALUE BET
+
+**Comando:** `cd paradigma && python -m scraping.scanner_v2 --books 1xbet,melbet,doradobet`
+**Duración:** ~6 min
+**Exit code:** 0
+
+**Output:**
+```
+Pinnacle:   106 eventos con odds
+1xBet:      156 eventos, 96 emparejados
+MelBet:     156 eventos, 96 emparejados
+DoradoBet:  0 eventos (bug parser — esperado)
+Total odds analizadas: 3,729
+
+VALUE BETS: 1
+  #1 [h2h] Leeds United vs Burnley — Vie 01 May — 19:00 UTC
+     Burnley @ 7.900 (1xBet)  |  Pinnacle: 6.83
+     EV: +7.12%  |  Kelly: 0.26%  |  Fair prob: 0.1356
+
+NEAR MISSES (EV 1-5%): 15
+  [spreads] Celta Vigo vs Elche        [Dom 03 May — 12:00 UTC] | Celta -1.5 @ 3.475    (Pin: 3.15) | EV: +3.96%
+  [spreads] Bologna vs Cagliari        [Dom 03 May — 10:30 UTC] | Bologna -1.5 @ 3.710  (Pin: 3.36) | EV: +3.65%
+  [spreads] Mainz 05 vs Union Berlin   [Dom 10 May — 17:30 UTC] | Mainz -1.5 @ 3.550   (Pin: 3.12) | EV: +3.36%
+  [h2h]     Union Berlin vs FC Koln    [Sáb 02 May — 13:30 UTC] | Draw @ 3.595          (Pin: 3.36) | EV: +3.16%
+  [h2h]     Leeds vs Burnley           [Vie 01 May — 19:00 UTC] | Burnley @ 7.600       (Pin: 6.83) | EV: +3.05%
+  [h2h]     Brentford vs West Ham      [Sáb 02 May — 14:00 UTC] | West Ham @ 3.775      (Pin: 3.53) | EV: +2.74%
+  [h2h]     Espanyol vs Real Madrid    [Dom 03 May — 19:00 UTC] | Real Madrid @ 1.778   (Pin: 1.69) | EV: +2.63%
+  [h2h]     Lecce vs Juventus          [Sáb 09 May — 18:45 UTC] | Juventus @ 1.628      (Pin: 1.54) | EV: +2.14%
+  [spreads] Lecce vs Juventus          [Sáb 09 May — 18:45 UTC] | Lecce 1.5 @ 1.649    (Pin: 1.56) | EV: +2.10%
+  [spreads] Auxerre vs Angers          [Dom 03 May — 15:15 UTC] | Auxerre -1.5 @ 3.625 (Pin: 3.34) | EV: +1.96%
+  [spreads] Real Betis vs Real Oviedo  [Dom 03 May — 16:30 UTC] | Oviedo 1.5 @ 1.533   (Pin: 1.47) | EV: +1.79%
+  [spreads] Bournemouth vs C. Palace   [Dom 03 May — 13:00 UTC] | C.Palace 1.5 @ 1.513 (Pin: 1.45) | EV: +1.68%
+  [h2h]     Arsenal vs Fulham          [Sáb 02 May — 16:30 UTC] | Arsenal @ 1.495       (Pin: 1.44) | EV: +1.52%
+  [h2h]     Hellas Verona vs Como      [Dom 10 May — 10:30 UTC] | Como @ 1.514          (Pin: 1.44) | EV: +1.35%
+  [spreads] Barcelona vs Real Madrid   [Dom 10 May — 19:00 UTC] | R.Madrid 1.5 @ 1.501 (Pin: 1.43) | EV: +1.32%
+  Por mercado: {'spreads': 8, 'h2h': 7}
+```
+
+**Observaciones:** Con 2 casas activas (1xBet + MelBet) se pasó de 1,972 a 3,729 odds analizadas. DoradoBet aportó 0 por el bug del parser. El sistema detectó 1 value bet real (Burnley +EV 7.12%). Las fechas aparecen en todos los near misses correctamente.
+
+---
+
 ### 2026-04-27 17:32 — MelBet scanner — FUNCIONA (96 emparejados, 2 near misses)
 
 **Comando:** `cd paradigma && python -m scraping.scanner_v2 --books melbet`
