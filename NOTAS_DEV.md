@@ -32,7 +32,41 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 14:00 — API Sniffer para bet365 y DoradoBet
+### 🔴 2026-04-27 17:25 — Scraper DoradoBet (Altenar) + test MelBet
+
+**Qué cambió:**
+1. **Nuevo: `scraping/doradobet_scraper.py`** — Scraper para DoradoBet usando la API de Altenar. Intercepta `GetUpcoming` y parsea eventos/odds.
+2. **scanner_v2.py** — Ahora soporta `doradobet` como casa adicional.
+3. Casas disponibles: `1xbet`, `melbet`, `20bet`, `doradobet`
+
+**Comandos (uno a la vez):**
+
+Primero probar DoradoBet sola (para ver si parsea bien):
+```bash
+cd paradigma
+python -m scraping.doradobet_scraper
+```
+
+Luego MelBet sola en el scanner:
+```bash
+python -m scraping.scanner_v2 --books melbet
+```
+
+Si ambas funcionan, probar 1xBet + MelBet + DoradoBet juntas:
+```bash
+python -m scraping.scanner_v2 --books 1xbet,melbet,doradobet
+```
+
+**Qué buscar:**
+- DoradoBet: ¿Detecta eventos? ¿Parsea las odds correctamente?
+- MelBet: ¿El scanner la detecta y empareja con Pinnacle?
+- Si DoradoBet falla, el debug JSON se guarda en `scraping_debug/doradobet_raw_*.json`
+
+**Pegar en RESULTADOS_TEST.md:** Output de cada comando.
+
+---
+
+### ✅ 2026-04-27 14:00 — API Sniffer para bet365 y DoradoBet
 
 **Qué cambió:**
 1. **Nuevo: `scraping/api_sniffer.py`** — Script que abre cualquier bookmaker en Playwright, captura TODO el tráfico de API, y lo guarda en JSON para análisis.

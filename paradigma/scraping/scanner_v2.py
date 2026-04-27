@@ -45,8 +45,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from ev_calculator import find_value_bets
 from scraping.pinnacle_scraper import PinnacleScraper
-from scraping.onexbet_scraper import OneXBetScraper, BOOK_CONFIGS
+from scraping.onexbet_scraper import OneXBetScraper, BOOK_CONFIGS as BETB2B_CONFIGS
+from scraping.doradobet_scraper import DoradoBetScraper
 from scraping.event_matcher import match_events, names_match
+
+# Registro unificado de todas las casas disponibles
+ALL_BOOKS = {
+    **{k: v["name"] for k, v in BETB2B_CONFIGS.items()},
+    "doradobet": "DoradoBet",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +80,7 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
 
     logger.info("=" * 60)
     logger.info(f"Scanner v2 (Scraping) — {datetime.now(timezone.utc).isoformat()}")
-    logger.info(f"  Casas: {', '.join(BOOK_CONFIGS[k]['name'] for k in book_keys)}")
+    logger.info(f"  Casas: {', '.join(ALL_BOOKS.get(k, k) for k in book_keys)}")
     logger.info("=" * 60)
 
     # ── 1. Scrape Pinnacle ──────────────────────────────────────
@@ -97,12 +104,19 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
     total_matched = 0
 
     for step_i, book_key in enumerate(book_keys, start=2):
-        book_name = BOOK_CONFIGS[book_key]["name"]
+        book_name = ALL_BOOKS.get(book_key, book_key)
         logger.info(f"\n🎰 Paso {step_i}/{total_steps}: Scraping {book_name}...")
 
         try:
-            scraper = OneXBetScraper(headless=headless, book_key=book_key)
-            soft_data, soft_events = scraper.scrape_football_odds()
+            if book_key in BETB2B_CONFIGS:
+                scraper = OneXBetScraper(headless=headless, book_key=book_key)
+                soft_data, soft_events = scraper.scrape_football_odds()
+            elif book_key == "doradobet":
+                scraper = DoradoBetScraper(headless=headless)
+                soft_data, soft_events = scraper.scrape_football_odds()
+            else:
+                logger.warning(f"   Casa '{book_key}' no reconocida. Opciones: {list(ALL_BOOKS.keys())}")
+                continue
         except Exception as e:
             logger.error(f"   Error scraping {book_name}: {e}")
             continue
@@ -337,13 +351,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scanner v2 — Scraping multi-book")
     parser.add_argument(
         "--books", type=str, default="1xbet",
-        help=f"Casas a scrapear separadas por coma. Disponibles: {', '.join(BOOK_CONFIGS.keys())}"
+        help=f"Casas a scrapear separadas por coma. Disponibles: {', '.join(ALL_BOOKS.keys())}"
     )
     parser.add_argument("--no-headless", action="store_true", help="Mostrar browsers")
     args = parser.parse_args()
 
     book_keys = [k.strip() for k in args.books.split(",")]
-    book_names = [BOOK_CONFIGS[k]["name"] for k in book_keys if k in BOOK_CONFIGS]
+    book_names = [ALL_BOOKS[k] for k in book_keys if k in ALL_BOOKS]
 
     print(f"\n🚀 Scanner v2 — Scraping Mode (Pinnacle + {' + '.join(book_names)})")
     print(f"   Umbral EV: >{config.MIN_EV_PERCENT}%")
