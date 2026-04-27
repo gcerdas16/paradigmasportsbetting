@@ -22,9 +22,14 @@ logger = logging.getLogger(__name__)
 STRIP_SUFFIXES = [
     " fc", " cf", " sc", " ac", " afc", " ssc",
     " fk", " bk", " if", " ff",
-    " united", " utd",
-    " city",
-    " (w)", " (corners)", " (bookings)", " (cards)",
+]
+
+# Palabras en el nombre del equipo que indican un mercado especial
+# (no un partido real). Estos eventos se excluyen del matching.
+SPECIAL_MARKET_TAGS = [
+    "(bookings)", "(corners)", "(cards)", "(fouls)",
+    "(offsides)", "(throw-ins)", "(goal kicks)",
+    "bookings", "corners", "cards",
 ]
 
 # Mapeo manual para nombres muy distintos
@@ -102,6 +107,12 @@ def normalize_name(name: str) -> str:
     return s
 
 
+def is_special_market_event(team_name: str) -> bool:
+    """Detecta si un nombre de equipo es de un mercado especial (Bookings, Corners, etc.)."""
+    lower = team_name.lower()
+    return any(tag in lower for tag in SPECIAL_MARKET_TAGS)
+
+
 def names_match(name_a: str, name_b: str) -> bool:
     """¿Dos nombres de equipo refieren al mismo equipo?"""
     a = normalize_name(name_a)
@@ -111,15 +122,21 @@ def names_match(name_a: str, name_b: str) -> bool:
         return True
 
     # Uno contiene al otro (ej: "arsenal" en "arsenal fc")
-    if a in b or b in a:
+    # Pero solo si la diferencia es pequeña (evita "manchester" in "manchester united")
+    if a in b and len(b) - len(a) <= 4:
+        return True
+    if b in a and len(a) - len(b) <= 4:
         return True
 
-    # Verificar si comparten palabras significativas (>3 chars)
-    words_a = {w for w in a.split() if len(w) > 3}
-    words_b = {w for w in b.split() if len(w) > 3}
+    # Comparar palabra por palabra: TODAS las palabras significativas
+    # del nombre más corto deben estar en el más largo.
+    # Esto evita "manchester united" == "manchester city".
+    words_a = [w for w in a.split() if len(w) > 2]
+    words_b = [w for w in b.split() if len(w) > 2]
     if words_a and words_b:
-        overlap = words_a & words_b
-        if overlap and len(overlap) >= min(len(words_a), len(words_b)):
+        shorter = words_a if len(words_a) <= len(words_b) else words_b
+        longer = set(words_b if len(words_a) <= len(words_b) else words_a)
+        if all(w in longer for w in shorter):
             return True
 
     return False
@@ -182,11 +199,17 @@ def match_events(
     matched = []
     used_soft = set()
     rejected_league = 0
+    rejected_special = 0
 
     for p_evt in pinnacle_events:
         p_home = p_evt["home_team"]
         p_away = p_evt["away_team"]
         p_league = p_evt.get("league", "")
+
+        # Excluir mercados especiales de Pinnacle (Bookings, Corners, etc.)
+        if is_special_market_event(p_home) or is_special_market_event(p_away):
+            rejected_special += 1
+            continue
 
         best_match = None
         best_score = 0
@@ -198,6 +221,10 @@ def match_events(
             s_home = s_evt["home_team"]
             s_away = s_evt["away_team"]
             s_league = s_evt.get("league", "")
+
+            # Excluir mercados especiales del soft book también
+            if is_special_market_event(s_home) or is_special_market_event(s_away):
+                continue
 
             # Verificar que ambos equipos coinciden
             home_ok = names_match(p_home, s_home)
@@ -223,6 +250,8 @@ def match_events(
             used_soft.add(best_match)
             matched.append((p_evt, soft_events[best_match]))
 
+    if rejected_special:
+        logger.info(f"  Excluidos por mercado especial (Bookings/Corners): {rejected_special}")
     if rejected_league:
         logger.info(f"  Rechazados por liga incompatible: {rejected_league}")
 
