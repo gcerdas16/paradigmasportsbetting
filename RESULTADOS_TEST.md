@@ -35,6 +35,90 @@
 
 ## Entradas
 
+### 2026-04-27 14:30 — API Sniffer — bet365, DoradoBet, MelBet, 20Bet
+
+**Comandos:**
+```bash
+cd paradigma
+python -m scraping.api_sniffer bet365
+python -m scraping.api_sniffer doradobet
+python -m scraping.api_sniffer melbet
+python -m scraping.api_sniffer 20bet
+```
+**Exit code:** 0 en todos (con warnings de timeout en bet365 y 20Bet)
+
+---
+
+**bet365**
+```
+Requests: 15 | Datos: 4499.7 KB | JSON: 5
+Dominio principal: www.bet365.com
+```
+- Screenshot: página cargando (spinner) — no terminó de renderizar en 30s
+- ⚠️ Las odds NO llegan por JSON. Usan protocolo binario propietario `Api/1/Blob`:
+  - `www.bet365.com/Api/1/Blob` (2205.7 KB, 1002.7 KB, 538 KB, 292.4 KB)
+- Los 5 JSON capturados son solo configuración del sitio (manifest, routing, auth)
+- **Conclusión: bet365 usa OCP (Open Connect Protocol) binario — muy difícil de parsear sin ingeniería inversa**
+
+---
+
+**DoradoBet**
+```
+Requests: 29 | Datos: 2981.3 KB | JSON: 14
+```
+- Screenshot: **404 NOT FOUND**
+- El sniffer intentó 3 URLs de fútbol (`/sportsbook/football`, `/sports/football`, `/en/sports/football`) — todas fallaron
+- Los JSON capturados son analytics (Amplitude, Facebook, Google) — cero datos de odds
+- **Conclusión: URL de fútbol desconocida. Hay que abrir doradobet.com manualmente, navegar a la sección de fútbol y revisar la URL correcta**
+
+---
+
+**MelBet** ✅
+```
+Requests: 103 | Datos: 3353.6 KB | JSON: 98
+Dominio principal: melbet.com
+```
+- Página cargó correctamente
+- **Endpoint clave detectado (idéntico al de 1xBet):**
+  ```
+  melbet.com/service-api/LineFeed/Get1x2_VZip  (113.8 KB × 3, 52.0 KB × 2)
+  melbet.com/service-api/LineFeed/GetSportsShortZip  (61.7 KB × 2)
+  melbet.com/service-api/LiveFeed/Get1x2_VZip
+  melbet.com/service-api/LineFeed/WebGetTopChampsZip
+  ```
+- Mismo backend BetB2B que 1xBet — solo cambia el dominio base
+- **Conclusión: El scraper de 1xBet debería funcionar para MelBet cambiando `cr.1xbet.com` → `melbet.com`**
+
+---
+
+**20Bet** ⚠️
+```
+Requests: 55 | Datos: 3020.6 KB | JSON: 31
+Dominio principal: platform.20bet.com
+```
+- Timeout en carga (60s excedido) pero capturó datos antes del timeout
+- Plataforma propia — NO usa backend BetB2B
+- Endpoints detectados:
+  ```
+  platform.20bet.com/api/sport/list/-1/0/en          (22.9 KB) ← posibles odds
+  platform.20bet.com/api/v4/sport/config              (119.2 KB)
+  platform.20bet.com/api/market-descriptions/get-all-markets/en  (736.2 KB)
+  ```
+- No se detectó un endpoint equivalente a `LineFeed/Get1x2_VZip`
+- **Conclusión: Plataforma diferente, necesita análisis del JSON `sport/list` para ver si contiene odds por partido**
+
+---
+
+**Archivos generados** (en `scraping_debug/api_sniff/`):
+- `bet365_api_20260427_230008.json`
+- `doradobet_api_20260427_230106.json`
+- `melbet_api_20260427_230217.json`
+- `20bet_api_20260427_230257.json`
+
+**Observaciones:** MelBet es la incorporación más fácil — mismo API que 1xBet. Para DoradoBet hay que encontrar la URL correcta manualmente. bet365 requiere ingeniería inversa del protocolo binario. 20Bet requiere análisis adicional del endpoint `sport/list`.
+
+---
+
 ### 2026-04-27 13:30 — Verificación manual odds — AMBOS scrapers confirmados vs sitios reales
 
 **Método:** verify_odds generó links + odds. Se abrieron en navegador y se compararon visualmente partido por partido.
