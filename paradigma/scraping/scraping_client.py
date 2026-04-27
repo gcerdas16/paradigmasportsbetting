@@ -18,6 +18,7 @@ import logging
 from typing import Optional
 
 from scraping.pinnacle_scraper import PinnacleScraper
+from scraping.onexbet_scraper import OneXBetScraper
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +27,17 @@ class ScrapingClient:
     """
     Cliente unificado de scraping.
 
-    Fase 1: Solo Pinnacle (para validar que el scraper funciona).
-    Fase 2: + 1xBet scraper (soft book).
-    Fase 3: + 888sport, Betway, etc.
+    Fase 1: Pinnacle (referencia sharp) + 1xBet (soft book).
+    Fase 2: + 888sport, bet365, etc.
 
-    En Fase 1, produce pinnacle_data para comparar con The Odds API y
-    validar que los datos son correctos.
+    Produce pinnacle_data + soft_book_odds en formato compatible
+    con ev_calculator.py sin necesidad de The Odds API.
     """
 
     def __init__(self, headless: bool = True):
         self.headless = headless
         self.pinnacle = PinnacleScraper(headless=headless)
+        self.onexbet = OneXBetScraper(headless=headless)
 
     def get_pinnacle_odds(
         self,
@@ -76,24 +77,44 @@ class ScrapingClient:
 
         return pinnacle_data, soft_book_odds, events_info
 
+    def get_onexbet_odds(self) -> tuple[dict, list[dict]]:
+        """
+        Scrapea 1xBet y retorna datos en formato Paradigma.
+
+        Returns:
+            soft_odds: dict event_id -> {market -> {(name, point) -> odds}}
+            events_info: lista de info de eventos
+        """
+        return self.onexbet.scrape_football_odds()
+
     def _get_soft_book_odds(self, events_info: list[dict]) -> list[dict]:
         """
-        Obtiene odds de casas blandas.
+        Obtiene odds de casas blandas (1xBet + futuras).
 
-        TODO Fase 2: Integrar scrapers de:
-        - 1xBet (basado en repos/sports-arbitrage-1xbet)
-        - 888sport
-        - Betway
-        - etc.
-
-        Por ahora retorna lista vacía. El sistema actual con The Odds API
-        sigue funcionando en paralelo para soft books.
+        Retorna lista de dicts en formato compatible con ev_calculator.
+        Cada dict tiene: event_id, book_key, book_title, markets.
         """
-        logger.warning(
-            "Soft book scraping no implementado aún. "
-            "Usar The Odds API para soft books mientras tanto."
-        )
-        return []
+        soft_book_odds = []
+
+        # --- 1xBet ---
+        try:
+            onexbet_data, onexbet_events = self.get_onexbet_odds()
+            logger.info(f"1xBet: {len(onexbet_data)} eventos con odds")
+            for eid, markets in onexbet_data.items():
+                soft_book_odds.append({
+                    "event_id": eid,
+                    "book_key": "onexbet",
+                    "book_title": "1xBet",
+                    "markets": markets,
+                })
+        except Exception as e:
+            logger.error(f"Error scraping 1xBet: {e}")
+
+        # TODO Fase 2: Agregar más scrapers
+        # - bet365 (accesible desde CR)
+        # - 888sport (accesible desde CR)
+
+        return soft_book_odds
 
 
 # ---------------------------------------------------------------------------

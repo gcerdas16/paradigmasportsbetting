@@ -221,59 +221,28 @@ class OneXBetScraper:
     ):
         """Extrae eventos de fútbol de la respuesta de la API de 1xBet.
 
-        1xBet puede devolver datos en varios formatos. Los principales son:
-        - Value: lista de eventos directos
-        - Result: objeto con eventos
-        - El body mismo puede ser un evento individual
+        Formato confirmado (Get1x2_VZip):
+            {"Value": [{O1, O2, I, LI, LE, E, AE, ...}, ...]}
         """
         events_to_process = []
 
-        # Formato 1: {"Value": [...]} o {"Result": [...]}
-        for key in ("Value", "Result", "Events", "Games", "data"):
+        for key in ("Value", "Result", "Events", "data"):
             if key in body and isinstance(body[key], list):
                 events_to_process.extend(body[key])
 
-        # Formato 2: El body contiene campos de evento directamente
-        if not events_to_process and self._looks_like_event(body):
+        if not events_to_process and "O1" in body and "O2" in body:
             events_to_process.append(body)
 
         for event in events_to_process:
             if not isinstance(event, dict):
                 continue
-            # Filtrar solo fútbol
-            sport_id = event.get("SI") or event.get("SportId") or event.get("sport_id")
+            # Filtrar solo fútbol (SI = Sport ID, 1 = football)
+            sport_id = event.get("SI")
             if sport_id is not None and int(sport_id) != FOOTBALL_SPORT_ID:
                 continue
-
-            # Verificar que tiene equipos y odds
-            if self._has_teams_and_odds(event):
+            # Debe tener equipos
+            if event.get("O1") and event.get("O2"):
                 all_events.append(event)
-
-    @staticmethod
-    def _looks_like_event(body: dict) -> bool:
-        """Heurística: ¿el dict parece un evento deportivo?"""
-        event_keys = {"CI", "LI", "O1", "O2", "AE", "ME"}
-        alt_keys = {"ChampionshipId", "LeagueId", "Opp1", "Opp2"}
-        return bool(event_keys & body.keys()) or bool(alt_keys & body.keys())
-
-    @staticmethod
-    def _has_teams_and_odds(event: dict) -> bool:
-        """¿El evento tiene equipos y alguna cuota?"""
-        # 1xBet usa formato comprimido con keys cortas
-        has_teams = bool(
-            (event.get("O1") or event.get("Opp1") or event.get("home"))
-            and (event.get("O2") or event.get("Opp2") or event.get("away"))
-        )
-        # Odds pueden estar en varios lugares
-        has_odds = bool(
-            event.get("E")  # Events/odds array
-            or event.get("ME")  # Market Events
-            or event.get("AE")  # All Events
-            or event.get("Odds")
-            or event.get("odds")
-            or event.get("CoefHome")
-        )
-        return has_teams or has_odds  # Ser permisivo para capturar más
 
     # ---------------------------------------------------------------------------
     # Conversión a formato Paradigma (compatible con ev_calculator.py)
@@ -294,209 +263,109 @@ class OneXBetScraper:
         events_info = []
         seen_ids = set()
 
-        # Primero procesar datos del endpoint 1x2 (más completo)
+        # Procesar todos los eventos capturados (tanto de raw_api_data como individuales)
+        all_to_parse = list(events)
+
+        # También extraer de raw_api_data
         for api_key, responses in raw_api_data.items():
             for response_data in responses:
-                parsed = self._parse_1xbet_response(response_data)
-                for evt in parsed:
-                    eid = evt.get("event_id")
-                    if eid and eid not in seen_ids:
-                        seen_ids.add(eid)
-                        if evt.get("markets"):
-                            soft_odds[eid] = evt["markets"]
-                        events_info.append({
-                            "event_id": eid,
-                            "home_team": evt.get("home", ""),
-                            "away_team": evt.get("away", ""),
-                            "league": evt.get("league", ""),
-                            "commence_time": evt.get("start_time", ""),
-                            "sport_key": "soccer",
-                            "sport_title": f"Soccer - {evt.get('league', '')}",
-                        })
+                if isinstance(response_data, dict):
+                    items = response_data.get("Value", [])
+                    if isinstance(items, list):
+                        all_to_parse.extend(items)
 
-        # Luego procesar eventos individuales capturados
-        for event in events:
+        for event in all_to_parse:
             parsed = self._parse_single_event(event)
-            if parsed:
-                eid = parsed.get("event_id")
-                if eid and eid not in seen_ids:
-                    seen_ids.add(eid)
-                    if parsed.get("markets"):
-                        soft_odds[eid] = parsed["markets"]
-                    events_info.append({
-                        "event_id": eid,
-                        "home_team": parsed.get("home", ""),
-                        "away_team": parsed.get("away", ""),
-                        "league": parsed.get("league", ""),
-                        "commence_time": parsed.get("start_time", ""),
-                        "sport_key": "soccer",
-                        "sport_title": f"Soccer - {parsed.get('league', '')}",
-                    })
+            if not parsed:
+                continue
+            eid = parsed["event_id"]
+            if eid in seen_ids:
+                continue
+            seen_ids.add(eid)
+            if parsed["markets"]:
+                soft_odds[eid] = parsed["markets"]
+            events_info.append({
+                "event_id": eid,
+                "home_team": parsed["home"],
+                "away_team": parsed["away"],
+                "league": parsed["league"],
+                "commence_time": parsed["start_time"],
+                "sport_key": "soccer",
+                "sport_title": f"Soccer - {parsed['league']}",
+            })
 
         return soft_odds, events_info
-
-    def _parse_1xbet_response(self, data) -> list[dict]:
-        """Parsea una respuesta completa de la API de 1xBet."""
-        results = []
-
-        if isinstance(data, dict):
-            # {"Value": [...]} es el formato más común
-            items = (
-                data.get("Value")
-                or data.get("Result")
-                or data.get("Events")
-                or data.get("data")
-                or []
-            )
-            if isinstance(items, list):
-                for item in items:
-                    parsed = self._parse_single_event(item)
-                    if parsed:
-                        results.append(parsed)
-            else:
-                parsed = self._parse_single_event(data)
-                if parsed:
-                    results.append(parsed)
-        elif isinstance(data, list):
-            for item in data:
-                parsed = self._parse_single_event(item)
-                if parsed:
-                    results.append(parsed)
-
-        return results
 
     def _parse_single_event(self, event: dict) -> Optional[dict]:
         """Parsea un evento individual de 1xBet.
 
-        1xBet usa un formato comprimido con keys cortas:
-            CI/ChampionshipId = League ID
-            LI/LeagueId = League ID
-            O1/Opp1 = Home team
-            O2/Opp2 = Away team
-            I/Id = Event ID
-            S/Start = Start time
-            E = List of odds entries
-            AE = Additional events
-            ME = Market events
+        Estructura confirmada (Get1x2_VZip → Value[]):
+            I   = Event ID (ej: 711873450)
+            O1  = Home team (ej: "Manchester United")
+            O2  = Away team
+            L   = Liga (idioma local)
+            LE  = Liga (inglés, ej: "England. Premier League")
+            LI  = League ID (ej: 88637)
+            CE  = País (ej: "England")
+            S   = Start time (timestamp)
+            SI  = Sport ID (1 = fútbol)
+            E   = Lista de odds: [{C, CV, G, T, P?}, ...]
+                  G=1 → moneyline: T=1 home, T=2 draw, T=3 away
+                  G=1 → totals:    T=9 over, T=10 under (P = points)
+                  G=1 → handicap:  T=7 home, T=8 away (P = points)
+            AE  = Additional events (mercados extra):
+                  [{G: 2, ME: [{C, CE, CV, G, T, P?}, ...]}, ...]
         """
         if not isinstance(event, dict):
             return None
 
-        # Extraer info del evento
-        home = (
-            event.get("O1")
-            or event.get("Opp1")
-            or event.get("home")
-            or event.get("Home")
-            or ""
-        )
-        away = (
-            event.get("O2")
-            or event.get("Opp2")
-            or event.get("away")
-            or event.get("Away")
-            or ""
-        )
+        home = event.get("O1", "")
+        away = event.get("O2", "")
         if not home or not away:
             return None
 
-        event_id = str(
-            event.get("I")
-            or event.get("Id")
-            or event.get("id")
-            or event.get("CI", "")
-        )
+        event_id = event.get("I")
         if not event_id:
             return None
+        event_id = str(event_id)
 
-        league = (
-            event.get("L")
-            or event.get("League")
-            or event.get("league")
-            or event.get("ChampionshipName")
-            or ""
-        )
-        start_time = (
-            event.get("S")
-            or event.get("Start")
-            or event.get("start_time")
-            or event.get("StartDate")
-            or ""
-        )
+        # Preferir nombre en inglés (LE) sobre local (L)
+        league = event.get("LE") or event.get("L") or ""
+        start_time = event.get("S") or ""
 
-        # Filtrar solo fútbol (sport_id = 1)
-        sport_id = event.get("SI") or event.get("SportId") or event.get("sport_id")
+        # Filtrar solo fútbol
+        sport_id = event.get("SI")
         if sport_id is not None and int(sport_id) != FOOTBALL_SPORT_ID:
             return None
 
-        # Parsear odds
         markets = {}
+        h2h_odds = {}
+        totals_odds = {}
+        spreads_odds = {}
 
-        # --- Odds de los campos E (Events) ---
-        odds_list = event.get("E", []) or event.get("AE", []) or event.get("ME", [])
-        if isinstance(odds_list, list):
-            h2h_odds = {}
-            totals_odds = {}
-            spreads_odds = {}
+        # --- E: Lista principal de odds ---
+        e_list = event.get("E", [])
+        if isinstance(e_list, list):
+            self._parse_odds_entries(e_list, home, away,
+                                    h2h_odds, totals_odds, spreads_odds)
 
-            for entry in odds_list:
-                if not isinstance(entry, dict):
+        # --- AE: Mercados adicionales (handicaps, totals extra) ---
+        ae_list = event.get("AE", [])
+        if isinstance(ae_list, list):
+            for ae_group in ae_list:
+                if not isinstance(ae_group, dict):
                     continue
+                me_list = ae_group.get("ME", [])
+                if isinstance(me_list, list):
+                    self._parse_odds_entries(me_list, home, away,
+                                            h2h_odds, totals_odds, spreads_odds)
 
-                # 1xBet usa T (Type) y C (Coefficient/Odds)
-                t = entry.get("T")
-                c = entry.get("C")
-                p = entry.get("P")  # Points (para totals/handicaps)
-
-                if t is None or c is None:
-                    continue
-
-                try:
-                    odds = float(c)
-                except (ValueError, TypeError):
-                    continue
-
-                if odds <= 1.0:
-                    continue
-
-                # Mapeo de tipos de 1xBet
-                # T=1: Home win, T=2: Away win, T=3: Draw
-                # T=9: Over, T=10: Under
-                # T=7: Handicap Home, T=8: Handicap Away
-                if t == 1:
-                    h2h_odds[(home, None)] = odds
-                elif t == 2:
-                    h2h_odds[(away, None)] = odds
-                elif t == 3:
-                    h2h_odds[("Draw", None)] = odds
-                elif t == 9 and p is not None:
-                    totals_odds[("Over", float(p))] = odds
-                elif t == 10 and p is not None:
-                    totals_odds[("Under", float(p))] = odds
-                elif t == 7 and p is not None:
-                    spreads_odds[(home, float(p))] = odds
-                elif t == 8 and p is not None:
-                    spreads_odds[(away, float(p))] = odds
-
-            if h2h_odds:
-                markets["h2h"] = h2h_odds
-            if totals_odds:
-                markets["totals"] = totals_odds
-            if spreads_odds:
-                markets["spreads"] = spreads_odds
-
-        # --- Odds de campos directos (formato alternativo) ---
-        if not markets:
-            h2h_odds = {}
-            for key, name in [("CoefHome", home), ("CoefDraw", "Draw"), ("CoefAway", away)]:
-                val = event.get(key)
-                if val:
-                    try:
-                        h2h_odds[(name, None)] = float(val)
-                    except (ValueError, TypeError):
-                        pass
-            if h2h_odds:
-                markets["h2h"] = h2h_odds
+        if h2h_odds:
+            markets["h2h"] = h2h_odds
+        if totals_odds:
+            markets["totals"] = totals_odds
+        if spreads_odds:
+            markets["spreads"] = spreads_odds
 
         return {
             "event_id": event_id,
@@ -506,6 +375,63 @@ class OneXBetScraper:
             "start_time": start_time,
             "markets": markets,
         }
+
+    @staticmethod
+    def _parse_odds_entries(
+        entries: list[dict],
+        home: str,
+        away: str,
+        h2h_odds: dict,
+        totals_odds: dict,
+        spreads_odds: dict,
+    ):
+        """Parsea una lista de odds entries de 1xBet.
+
+        Cada entry tiene:
+            C  = coeficiente decimal (ej: 2.007)
+            CV = formato americano (ej: "+101")
+            G  = grupo (1 = principal, 2 = alternativo)
+            T  = tipo de mercado:
+                 1 = Home win, 2 = Draw, 3 = Away win
+                 7 = Handicap Home, 8 = Handicap Away
+                 9 = Over, 10 = Under
+            P  = points (para totals/handicaps)
+        """
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+
+            t = entry.get("T")
+            c = entry.get("C")
+            if t is None or c is None:
+                continue
+
+            try:
+                odds = float(c)
+            except (ValueError, TypeError):
+                continue
+            if odds <= 1.0:
+                continue
+
+            p = entry.get("P")  # Points para totals/handicaps
+
+            # 1X2 (moneyline)
+            if t == 1:
+                h2h_odds[(home, None)] = odds
+            elif t == 2:
+                h2h_odds[("Draw", None)] = odds
+            elif t == 3:
+                h2h_odds[(away, None)] = odds
+            # Totals
+            elif t == 9 and p is not None:
+                totals_odds[("Over", float(p))] = odds
+            elif t == 10 and p is not None:
+                totals_odds[("Under", float(p))] = odds
+            # Handicaps
+            elif t == 7 and p is not None:
+                spreads_odds[(home, float(p))] = odds
+            elif t == 8 and p is not None:
+                spreads_odds[(away, float(p))] = odds
 
     # ---------------------------------------------------------------------------
     # Debug
