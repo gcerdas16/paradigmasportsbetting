@@ -56,6 +56,22 @@ SITES = {
         ],
         "domain_hints": ["20bet"],
     },
+    "888sport": {
+        "name": "888sport",
+        "start_url": "https://www.888sport.es/futbol/",
+        "football_urls": [
+            "https://www.888sport.es/futbol/",
+        ],
+        "domain_hints": ["888sport", "kambi"],
+    },
+    "betsafe": {
+        "name": "BetSafe",
+        "start_url": "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming",
+        "football_urls": [
+            "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming",
+        ],
+        "domain_hints": ["betsafe", "kambi", "betsson"],
+    },
 }
 
 

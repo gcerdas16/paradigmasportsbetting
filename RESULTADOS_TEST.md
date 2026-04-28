@@ -696,3 +696,80 @@ Value bets: 1 — Leeds vs Burnley | Burnley @ 7.700 | EV: +5.28%
 ```
 
 **Observaciones:** Bug — matcher recibía todos los matchups, no solo los con odds. Solo 2/115 Pinnacle llegaban al EV calc.
+
+---
+
+### 2026-04-27 21:30 — Kambi scrapers: 888sport, Unibet, BetSafe (PARTE 1)
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book 888sport` (y unibet, betsafe)
+**Duración:** ~6 min por casa (timeout)
+**Exit code:** 0 (pero 0 eventos)
+
+**Output:**
+```
+888sport: 0 eventos, 0 con odds
+  WARNING: HTTPSConnectionPool(host='eu-offering.kambicdn.org', port=443):
+  Max retries exceeded — ConnectTimeoutError (connect timeout=15)
+  No se encontraron competiciones. Usando lista fija. 8 competiciones a scrapear.
+  Scraping completado: 0 eventos, 0 con odds
+
+Unibet: mismo resultado (mismo host, mismo timeout)
+BetSafe: mismo resultado
+```
+
+**Diagnóstico:** `eu-offering.kambicdn.org` está completamente inaccesible desde esta red (curl exit code 28, ni siquiera conecta). El CDN de Kambi parece geo-bloqueado o bloqueado por el ISP.
+
+---
+
+### 2026-04-27 21:45 — API Sniffer en 888sport.es y BetSafe (PARTE 1b)
+
+**Comando:** `cd paradigma && python3 -m scraping.api_sniffer 888sport` y `betsafe`
+**Duración:** ~2 min por casa
+**Exit code:** 0
+
+**Resultado 888sport:**
+```
+Plataforma: Spectate (propia de 888sport — NO es Kambi)
+API domain: spectate-web.888sport.es
+Endpoint clave: /spectate/sportsbook-req/getUpcomingEvents/football/today
+  → Keys: ['selection_pointers', 'events', 'event_order', 'match_request_limit']
+  → selection_pointers: array con event_id, market_id, selection_id
+  → 5 eventos capturados en el scroll inicial
+
+Otros endpoints:
+  /spectate/load/state → clientState, user
+  /spectate/market_switcher_requests/getMarketSwitcher/football → 10 tipos de mercado
+    (match-winner 1X2, both-teams-to-score, etc.)
+
+CONCLUSIÓN: 888sport migró fuera de Kambi a plataforma propia Spectate.
+El kambi_scraper con operador "888" nunca va a funcionar.
+```
+
+**Resultado BetSafe:**
+```
+Plataforma: Betsson Group API propia (NO es el CDN público de Kambi)
+API domain: www.betsafe.com/api/sb/v1/
+Requests JSON capturados: 41
+Datos totales: 10.4 MB
+
+Endpoints clave:
+  /api/sb/v1/widgets/event-market/v1 → 5 respuestas (81KB, 237KB, 99KB, 166KB, 249KB)
+    Keys: ['skeleton', 'topics', 'topicsMap', 'data', 'referenceId']
+    data.keys: ['events', 'markets', 'marketSelections', 'scoreboards']
+  /api/sb/v1/widgets/categories/v2 → 3,590KB
+    Keys: ['data', 'referenceId'] — data.items (listado completo de competiciones)
+  /api/sb/v1/widgets/view/v1 → 3,798KB
+    Keys: ['data', 'referenceId'] — data.widgets
+
+URLs de mercados llevan parámetro ?marketids=m-f-XXXXX-MARKET_TYPE
+Ejemplo: m-f-Ktp6sppDm02O23QgYDNymA-AGSNAB (AGSNAB = Asian Handicap)
+
+CONCLUSIÓN: BetSafe usa su propio dominio como proxy de Kambi.
+El kambi_scraper apuntando a eu-offering.kambicdn.org no funciona,
+pero www.betsafe.com/api/sb/v1/ SÍ es accesible y tiene los datos.
+Requiere nuevo scraper tipo Playwright para interceptar event-market/v1.
+```
+
+**Archivos de debug:**
+- `scraping_debug/api_sniff/888sport_api_20260428_033853.json`
+- `scraping_debug/api_sniff/betsafe_api_20260428_033907.json`
