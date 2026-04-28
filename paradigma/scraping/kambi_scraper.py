@@ -230,8 +230,12 @@ class Sport888Scraper:
         """Extrae mercados/odds de un evento Spectate."""
         markets = {}
 
-        # Buscar en sub-objetos que contengan odds/selections/markets
-        for key in ("selections", "markets", "odds", "betOffers",
+        # Estructura 888sport Spectate confirmada:
+        # evt["markets"][mkt_id]["selections"][sel_id]["decimal_price"] = "5.500"
+        # evt["markets"][mkt_id]["selections"][sel_id]["type"] = "1"/"X"/"2"
+        # evt["markets"][mkt_id]["name"] = "Ganador del partido"
+
+        for key in ("markets", "selections", "odds", "betOffers",
                     "match_markets", "prices"):
             container = evt.get(key)
             if not container:
@@ -242,10 +246,22 @@ class Sport888Scraper:
                     _parse_generic_selection(item, home, away, markets)
             elif isinstance(container, dict):
                 for mk, mv in container.items():
-                    if isinstance(mv, list):
+                    if not isinstance(mv, dict):
+                        continue
+                    # Spectate: market dict con sub-dict "selections"
+                    sels = mv.get("selections")
+                    if isinstance(sels, dict):
+                        mkt_name = str(mv.get("name", "")).lower()
+                        for sel_id, sel in sels.items():
+                            if isinstance(sel, dict):
+                                # Inyectar market_name para clasificación
+                                sel_copy = dict(sel)
+                                sel_copy["_market_name"] = mkt_name
+                                _parse_generic_selection(sel_copy, home, away, markets)
+                    elif isinstance(mv, list):
                         for item in mv:
                             _parse_generic_selection(item, home, away, markets)
-                    elif isinstance(mv, dict):
+                    else:
                         _parse_generic_selection(mv, home, away, markets)
 
         # Buscar odds directamente en el evento (flat)
@@ -304,6 +320,17 @@ class BetSafeScraper:
     FOOTBALL_URL = "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming"
     API_PATH_PREFIX = "/api/sb/v1/"
 
+    # Ligas individuales para capturar 1X2 (no aparece en liveAndUpcoming)
+    LEAGUE_URLS = [
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/champions-league",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/europa-league",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/premier-league",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/la-liga",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/bundesliga",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/serie-a",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/ligue-1",
+    ]
+
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
         self.headless = headless
         self.timeout_ms = timeout_ms
@@ -349,20 +376,36 @@ class BetSafeScraper:
             page = ctx.new_page()
             page.on("response", on_response)
 
+            # Cargar página principal primero
             try:
                 logger.info(f"  Navegando a {self.FOOTBALL_URL}")
                 page.goto(self.FOOTBALL_URL, wait_until="networkidle",
                          timeout=self.timeout_ms)
                 page.wait_for_timeout(5_000)
             except Exception as e:
-                logger.warning(f"  Timeout en carga: {e}")
+                logger.warning(f"  Timeout en carga inicial: {e}")
 
-            # Scroll para cargar más
-            for _ in range(8):
+            # Scroll en la página principal
+            for _ in range(5):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2_000)
 
-            page.wait_for_timeout(3_000)
+            # Navegar a cada liga para capturar 1X2 y otros mercados
+            for league_url in self.LEAGUE_URLS:
+                try:
+                    logger.info(f"  Navegando a liga: {league_url.split('/')[-1]}")
+                    page.goto(league_url, wait_until="networkidle",
+                             timeout=self.timeout_ms)
+                    page.wait_for_timeout(3_000)
+                    # Scroll en liga
+                    for _ in range(3):
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        page.wait_for_timeout(1_500)
+                except Exception as e:
+                    logger.warning(f"  Error en liga: {e}")
+                    continue
+
+            page.wait_for_timeout(2_000)
             browser.close()
 
         logger.info(f"  BetSafe: {len(api_responses)} API responses capturadas")
@@ -420,34 +463,40 @@ class BetSafeScraper:
 
         return soft_odds, events_info
 
-    def _parse_betsafe_event(self, evt: dict, markets_map, selections_map,
+    def _parse_betsafe_event(self, evt: dict, markets_list: list,
+                              selections_list: list,
                               soft_odds: dict, events_info: list,
                               seen: set, fallback_id: str = ""):
-        """Parsea un evento de BetSafe."""
+        """Parsea un evento de BetSafe (estructura real confirmada)."""
         if not isinstance(evt, dict):
             return
 
-        # Nombres de equipo
-        home = (evt.get("homeName") or evt.get("home") or
-                evt.get("homeTeamName") or "")
-        away = (evt.get("awayName") or evt.get("away") or
-                evt.get("awayTeamName") or "")
+        # Estructura real: participants[i]["label"], participants[i]["side"]
+        home = ""
+        away = ""
+        participants = evt.get("participants") or evt.get("competitors") or []
+        if isinstance(participants, list) and len(participants) >= 2:
+            # Ordenar por side: 1=home, 2=away
+            sorted_parts = sorted(participants,
+                                  key=lambda p: p.get("side", 0) if isinstance(p, dict) else 0)
+            for part in sorted_parts:
+                if not isinstance(part, dict):
+                    continue
+                name = part.get("label") or part.get("name") or ""
+                side = part.get("side", 0)
+                if side == 1 or (not home and side != 2):
+                    home = name
+                elif side == 2 or (not away):
+                    away = name
 
-        # Intentar extraer de nombre combinado
+        # Fallback: extraer de label combinado
         if not home or not away:
-            name = evt.get("name", "") or evt.get("eventName", "")
-            for sep in [" v ", " vs ", " - ", " – ", " @ "]:
-                if sep in name:
-                    parts = name.split(sep, 1)
+            label = evt.get("label") or evt.get("name") or evt.get("eventName") or ""
+            for sep in [" v ", " vs ", " - ", " \u2013 ", " @ "]:
+                if sep in label:
+                    parts = label.split(sep, 1)
                     home, away = parts[0].strip(), parts[1].strip()
                     break
-
-        # Intentar desde participantes/competitors
-        if not home or not away:
-            participants = evt.get("participants") or evt.get("competitors") or []
-            if isinstance(participants, list) and len(participants) >= 2:
-                home = participants[0].get("name", "") if isinstance(participants[0], dict) else str(participants[0])
-                away = participants[1].get("name", "") if isinstance(participants[1], dict) else str(participants[1])
 
         if not home or not away:
             return
@@ -457,38 +506,38 @@ class BetSafeScraper:
             return
         seen.add(event_id)
 
-        league = (evt.get("competition") or evt.get("league") or
+        league = (evt.get("competitionName") or evt.get("competition") or
                   evt.get("categoryName") or evt.get("groupName") or "")
-        start_time = (evt.get("startTime") or evt.get("start") or
-                      evt.get("startDate") or "")
+        start_time = (evt.get("startDate") or evt.get("startTime") or
+                      evt.get("start") or "")
 
-        # Buscar mercados asociados a este evento
+        # Buscar mercados del evento en la lista de markets
         markets = {}
 
-        # Método 1: market IDs en el evento
-        market_ids = evt.get("marketIds") or evt.get("markets") or []
-        if isinstance(market_ids, list):
-            for mid in market_ids:
-                mid_str = str(mid)
-                if isinstance(markets_map, dict) and mid_str in markets_map:
-                    mkt = markets_map[mid_str]
-                    self._parse_betsafe_market(
-                        mkt, mid_str, selections_map, home, away, markets
-                    )
+        # markets_list es una LISTA de dicts con "eventId" y "marketTemplateId"
+        evt_markets = []
+        if isinstance(markets_list, list):
+            for mkt in markets_list:
+                if isinstance(mkt, dict) and str(mkt.get("eventId", "")) == event_id:
+                    evt_markets.append(mkt)
 
-        # Método 2: buscar por event_id en markets_map
-        if not markets and isinstance(markets_map, dict):
-            for mid, mkt in markets_map.items():
-                if isinstance(mkt, dict):
-                    mkt_event_id = str(mkt.get("eventId") or mkt.get("event_id") or "")
-                    if mkt_event_id == event_id:
-                        self._parse_betsafe_market(
-                            mkt, str(mid), selections_map, home, away, markets
-                        )
+        for mkt in evt_markets:
+            mkt_id = str(mkt.get("id", ""))
+            template = str(mkt.get("marketTemplateId", "")).upper()
 
-        # Método 3: odds directamente en el evento
-        if not markets:
-            markets = Sport888Scraper._extract_888_markets(evt, home, away)
+            # Encontrar selections de este mercado
+            mkt_sels = []
+            if isinstance(selections_list, list):
+                for sel in selections_list:
+                    if isinstance(sel, dict) and str(sel.get("marketId", "")) == mkt_id:
+                        mkt_sels.append(sel)
+
+            if not mkt_sels:
+                continue
+
+            self._classify_and_store(
+                template, mkt, mkt_sels, home, away, markets
+            )
 
         if markets:
             soft_odds[event_id] = markets
@@ -506,105 +555,87 @@ class BetSafeScraper:
         })
 
     @staticmethod
-    def _parse_betsafe_market(mkt: dict, mkt_id: str, selections_map,
-                               home: str, away: str, markets: dict):
-        """Parsea un mercado de BetSafe y extrae odds."""
-        if not isinstance(mkt, dict):
-            return
+    def _classify_and_store(template: str, mkt: dict, mkt_sels: list,
+                            home: str, away: str, markets: dict):
+        """
+        Clasifica mercado por marketTemplateId y almacena odds.
 
-        mkt_name = str(mkt.get("name") or mkt.get("marketName") or
-                       mkt.get("type") or mkt_id).lower()
+        Templates BetSafe confirmados:
+            MHDA  = Match Winner / 1X2
+            MWOU  = Over/Under totals
+            AGSNAB = Asian Handicap / Spread
+            BTTS  = Both Teams to Score (ignorar)
+            DC    = Double Chance (ignorar)
+        """
+        mkt_name = str(mkt.get("name") or mkt.get("marketName") or "").lower()
 
-        # Obtener selections (odds) de este mercado
-        selection_ids = mkt.get("selectionIds") or mkt.get("selections") or []
-        selections = []
+        # Clasificar por template ID
+        is_h2h = template in ("MHDA", "FT1X2", "1X2")
+        is_total = template in ("MWOU", "OU", "FTOU")
+        is_spread = template in ("AGSNAB", "AH", "FTAH", "HC")
 
-        if isinstance(selection_ids, list) and isinstance(selections_map, dict):
-            for sid in selection_ids:
-                sid_str = str(sid)
-                if sid_str in selections_map:
-                    selections.append(selections_map[sid_str])
-        elif isinstance(selection_ids, list):
-            # selections_map podría estar inlined
-            selections = [s for s in selection_ids if isinstance(s, dict)]
+        # Fallback: clasificar por nombre
+        if not is_h2h and not is_total and not is_spread:
+            if any(k in mkt_name for k in ["1x2", "match winner", "full time result",
+                                            "ganador", "winner"]):
+                is_h2h = True
+            elif any(k in mkt_name for k in ["over", "under", "total", "goles"]):
+                is_total = True
+            elif any(k in mkt_name for k in ["handicap", "spread", "hándicap"]):
+                is_spread = True
+            else:
+                return  # Skip unknown markets
 
-        # También buscar selections directamente en el mercado
-        if not selections:
-            for key in ("outcomes", "selections", "odds"):
-                val = mkt.get(key)
-                if isinstance(val, list):
-                    selections = val
-                    break
-
-        if not selections:
-            return
-
-        # Clasificar mercado
-        is_h2h = any(k in mkt_name for k in ["1x2", "match winner", "fulltime",
-                                               "full time", "match result",
-                                               "moneyline", "winner"])
-        is_total = any(k in mkt_name for k in ["over", "under", "total",
-                                                 "goals"])
-        is_spread = any(k in mkt_name for k in ["handicap", "spread", "asian",
-                                                  "hcap"])
-
-        for sel in selections:
+        for sel in mkt_sels:
             if not isinstance(sel, dict):
                 continue
 
-            odds = sel.get("odds") or sel.get("price") or sel.get("decimal")
+            odds = sel.get("odds") or sel.get("price")
             if odds is None:
                 continue
             try:
                 odds = float(odds)
-                if odds > 100:
-                    odds = odds / 1000.0
             except (ValueError, TypeError):
                 continue
             if odds <= 1.0:
                 continue
 
-            label = str(sel.get("name") or sel.get("label") or
-                       sel.get("selectionName") or "")
+            label = str(sel.get("label") or sel.get("name") or "").strip()
             line = sel.get("line") or sel.get("handicap") or sel.get("points")
 
-            if is_total and line is not None:
+            if is_h2h:
+                if "h2h" not in markets:
+                    markets["h2h"] = {}
+                if label == home:
+                    markets["h2h"][(home, None)] = odds
+                elif label.lower() in ("draw", "x", "empate"):
+                    markets["h2h"][("Draw", None)] = odds
+                elif label == away:
+                    markets["h2h"][(away, None)] = odds
+
+            elif is_total and line is not None:
                 try:
                     line = float(line)
-                    if line > 100:
-                        line = line / 1000.0
                 except (ValueError, TypeError):
                     continue
                 if "totals" not in markets:
                     markets["totals"] = {}
-                if "over" in label.lower():
+                if "over" in label.lower() or "m\u00e1s" in label.lower():
                     markets["totals"][("Over", line)] = odds
-                elif "under" in label.lower():
+                elif "under" in label.lower() or "menos" in label.lower():
                     markets["totals"][("Under", line)] = odds
 
             elif is_spread and line is not None:
                 try:
                     line = float(line)
-                    if abs(line) > 100:
-                        line = line / 1000.0
                 except (ValueError, TypeError):
                     continue
                 if "spreads" not in markets:
                     markets["spreads"] = {}
-                if label == home or "1" == label or "home" in label.lower():
+                if label == home:
                     markets["spreads"][(home, line)] = odds
-                elif label == away or "2" == label or "away" in label.lower():
+                elif label == away:
                     markets["spreads"][(away, -line)] = odds
-
-            elif is_h2h or (not is_total and not is_spread):
-                if "h2h" not in markets:
-                    markets["h2h"] = {}
-                if label == home or "1" == label or "home" in label.lower():
-                    markets["h2h"][(home, None)] = odds
-                elif label.lower() in ("draw", "x", "empate"):
-                    markets["h2h"][("Draw", None)] = odds
-                elif label == away or "2" == label or "away" in label.lower():
-                    markets["h2h"][(away, None)] = odds
 
     def _save_debug(self, responses: list[dict]):
         DEBUG_DIR.mkdir(exist_ok=True)
@@ -630,7 +661,9 @@ def _parse_generic_selection(item: dict, home: str, away: str, markets: dict):
     if not isinstance(item, dict):
         return
 
-    odds = item.get("odds") or item.get("price") or item.get("decimal")
+    # 888sport usa "decimal_price" (string), BetSafe usa "odds" (float)
+    odds = (item.get("decimal_price") or item.get("odds") or
+            item.get("price") or item.get("decimal"))
     if odds is None:
         return
     try:
@@ -644,12 +677,14 @@ def _parse_generic_selection(item: dict, home: str, away: str, markets: dict):
 
     label = str(item.get("name") or item.get("label") or
                 item.get("selection_name") or "")
-    mkt_type = str(item.get("market_type") or item.get("type") or
+    # 888sport Spectate: "type" = "1"/"X"/"2" para 1X2
+    sel_type = str(item.get("type", ""))
+    mkt_name = str(item.get("_market_name") or item.get("market_type") or
                    item.get("marketName") or "").lower()
 
     line = item.get("line") or item.get("handicap") or item.get("points")
 
-    if "total" in mkt_type or "over" in mkt_type:
+    if "total" in mkt_name or "over" in mkt_name or "under" in mkt_name:
         if line is not None:
             try:
                 line = float(line)
@@ -661,7 +696,7 @@ def _parse_generic_selection(item: dict, home: str, away: str, markets: dict):
                 markets["totals"][("Over", line)] = odds
             elif "under" in label.lower():
                 markets["totals"][("Under", line)] = odds
-    elif "handicap" in mkt_type or "spread" in mkt_type:
+    elif "handicap" in mkt_name or "spread" in mkt_name:
         if line is not None:
             try:
                 line = float(line)
@@ -674,13 +709,14 @@ def _parse_generic_selection(item: dict, home: str, away: str, markets: dict):
             elif label == away or "away" in label.lower():
                 markets["spreads"][(away, -line)] = odds
     else:
+        # 1X2 / Match Winner — usar type si disponible
         if "h2h" not in markets:
             markets["h2h"] = {}
-        if label == home or label == "1" or "home" in label.lower():
+        if label == home or sel_type == "1" or "home" in label.lower():
             markets["h2h"][(home, None)] = odds
-        elif label.lower() in ("draw", "x", "empate"):
+        elif label.lower() in ("draw", "x", "empate") or sel_type.upper() == "X":
             markets["h2h"][("Draw", None)] = odds
-        elif label == away or label == "2" or "away" in label.lower():
+        elif label == away or sel_type == "2" or "away" in label.lower():
             markets["h2h"][(away, None)] = odds
 
 
