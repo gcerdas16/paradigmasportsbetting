@@ -38,7 +38,39 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 21:45 — REESCRITO: 888sport (Spectate) + BetSafe (Betsson API) — Playwright
+### 🔴 2026-04-27 22:05 — FIX PARSERS: 888sport (decimal_price) + BetSafe (label, lists, league URLs)
+
+**Basado en los resultados de test de las 22:00.** Ambos scrapers conectan y capturan datos pero parsean 0 eventos.
+
+**Fixes aplicados a `kambi_scraper.py`:**
+
+**888sport:**
+1. `decimal_price` no reconocido → ahora busca `decimal_price` además de `odds`/`price`
+2. No profundizaba en `market["selections"]` → ahora itera `selections.values()`
+3. `type` = "1"/"X"/"2" → se usa para clasificar 1X2 cuando label no matchea
+
+**BetSafe:**
+1. `participants[i]["label"]` no `"name"` → corregido
+2. `markets` y `marketSelections` son **listas** (no dicts) → matcheo por `eventId`/`marketId`
+3. Clasificación por `marketTemplateId`: `MHDA`=1X2, `MWOU`=O/U, `AGSNAB`=Handicap
+4. Agregadas 7 URLs de ligas individuales (UCL, EPL, La Liga, etc.) para capturar 1X2
+
+**Comandos de test (mismos que antes):**
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book 888sport --no-headless
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar esta vez:**
+- 888sport: ¿parsea los 5 eventos con `decimal_price`? (esperado: ~5 eventos con h2h)
+- BetSafe: ¿encuentra participantes con `label`? ¿las ligas capturan 1X2 (MHDA)?
+- Si 0 eventos de nuevo → pegar el debug JSON y yo itero
+
+---
+
+### ✅ 2026-04-27 21:45 — (v1) REESCRITO: 888sport (Spectate) + BetSafe (Betsson API) — Playwright
 
 **Contexto:** Los tests de la v1 revelaron:
 - `eu-offering.kambicdn.org` está completamente bloqueado (timeout)
