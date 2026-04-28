@@ -1039,3 +1039,67 @@ response = await page.evaluate(f"fetch('{url}').then(r => r.json())")
 ```
 
 **Archivos debug:** `scraping_debug/betsafe_betsson_20260428_041403.json`
+
+---
+
+### 2026-04-27 22:55 — Re-test v3: 888sport EU leagues + BetSafe MW3W fetch
+
+---
+
+#### 888sport — ✅ 86 eventos con odds
+
+```
+888sport — Eventos con odds: 86
+Ligas europeas: Premier League, La Liga, Bundesliga, Serie A, Ligue 1, UCL, UEL ✅
+Ejemplos:
+  Leeds vs Burnley → Burnley:7.00, Leeds:1.40, Draw:4.40
+  Man Utd vs Liverpool → Liverpool:2.70, Draw:3.60, Man Utd:2.375
+  Brentford vs West Ham → Brentford:2.05, Draw:3.60, West Ham:3.20
+  Atletico Madrid vs Celta Vigo → Atletico:1.85, Draw:3.50, Celta:3.90
+```
+
+Fix de EU leagues funcionó. De 11 eventos regionales → 86 eventos con ligas europeas. ✅
+
+---
+
+#### BetSafe — ❌ 0 eventos (fetch explícito falló, pero se identificó endpoint correcto)
+
+**Fetch MW3W explícito:** Falló con `E_VALIDATION_INVALIDHEADER`
+- `page.evaluate(fetch(...))` no envía los headers de sesión requeridos por BetSafe
+- El request necesita headers adicionales que el browser tiene pero el fetch manual no incluye
+
+**HALLAZGO CLAVE: endpoint correcto es `events-table/v2` (NO `event-market/v1`)**
+
+Al navegar a cada liga, BetSafe carga automáticamente:
+```
+GET /api/sb/v1/widgets/events-table/v2?categoryIds=1&competitionIds={id}&...
+```
+Esta respuesta SÍ contiene MW3W con odds completas:
+```
+events-table/v2 → UCL:
+  Event: Atlético Madrid vs Arsenal
+    MW3W market: m-f-7kL1fDKRJk-lrYkt1-XNTA-MW3W
+    selections (3):
+      Atlético Madrid odds=2.95  template=HOME
+      Empate          odds=3.25  template=DRAW
+      Arsenal         odds=2.58  template=AWAY
+
+  Event: Paris SG vs Bayern de Múnich
+    MW3W market: m-f-lGGIMROeykmUeY-bc5dXoA-MW3W
+    selections (3):
+      Paris SG        odds=2.48  template=HOME
+      Empate          odds=3.90  template=DRAW
+      Bayern de Múnich odds=2.65 template=AWAY
+```
+
+**Diferencias críticas respecto a event-market/v1:**
+- Usa `inner["selections"]` (no `inner["marketSelections"]`)
+- Templates de selección: `HOME`, `DRAW`, `AWAY` (no nombres de equipo)
+- URL: `events-table/v2` con `competitionIds` (no `event-market/v1`)
+
+**Fix necesario en `_parse_betsson`:**
+1. Incluir `events-table` en el URL filter (junto a `event-market` y `view`)
+2. Usar `inner.get("selections", [])` en vez de `inner.get("marketSelections", [])`
+3. Clasificar HOME/DRAW/AWAY por `selectionTemplateId` en vez de `label`
+
+**Archivo debug:** `scraping_debug/betsafe_betsson_20260428_045648.json`
