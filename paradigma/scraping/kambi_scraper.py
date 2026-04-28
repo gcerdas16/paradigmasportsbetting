@@ -330,15 +330,10 @@ class BetSafeScraper:
     FOOTBALL_URL = "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming"
     API_PATH_PREFIX = "/api/sb/v1/"
 
-    # Ligas individuales para capturar 1X2 (no aparece en liveAndUpcoming)
-    LEAGUE_URLS = [
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/champions-league",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/europa-league",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/premier-league",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/la-liga",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/bundesliga",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/serie-a",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/ligue-1",
+    # Keywords para encontrar ligas europeas en links del sidebar
+    LEAGUE_KEYWORDS = [
+        "champions", "europa league", "premier", "la liga",
+        "bundesliga", "serie a", "ligue 1",
     ]
 
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
@@ -400,20 +395,34 @@ class BetSafeScraper:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2_000)
 
-            # Navegar a cada liga para capturar 1X2 y otros mercados
-            for league_url in self.LEAGUE_URLS:
-                try:
-                    logger.info(f"  Navegando a liga: {league_url.split('/')[-1]}")
-                    page.goto(league_url, wait_until="networkidle",
-                             timeout=self.timeout_ms)
-                    page.wait_for_timeout(3_000)
-                    # Scroll en liga
-                    for _ in range(3):
-                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        page.wait_for_timeout(1_500)
-                except Exception as e:
-                    logger.warning(f"  Error en liga: {e}")
-                    continue
+            # Navegar a ligas haciendo click en links del sidebar/menú
+            try:
+                all_links = page.query_selector_all('a[href*="/futbol/"]')
+                league_hrefs = []
+                for link in all_links:
+                    href = link.get_attribute("href") or ""
+                    text = (link.inner_text() or "").lower()
+                    for kw in self.LEAGUE_KEYWORDS:
+                        if kw in text or kw in href.lower():
+                            full_url = href if href.startswith("http") else f"https://www.betsafe.com{href}"
+                            if full_url not in league_hrefs:
+                                league_hrefs.append(full_url)
+                            break
+                logger.info(f"  Encontradas {len(league_hrefs)} ligas en el menú")
+                for lh in league_hrefs:
+                    try:
+                        logger.info(f"  Navegando a liga: {lh.split('/')[-1]}")
+                        page.goto(lh, wait_until="networkidle",
+                                 timeout=self.timeout_ms)
+                        page.wait_for_timeout(3_000)
+                        for _ in range(3):
+                            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            page.wait_for_timeout(1_500)
+                    except Exception as e:
+                        logger.warning(f"  Error en liga: {e}")
+                        continue
+            except Exception as e:
+                logger.warning(f"  Error buscando ligas en menú: {e}")
 
             page.wait_for_timeout(2_000)
             browser.close()
@@ -540,18 +549,33 @@ class BetSafeScraper:
             mkt_sels = []
             if isinstance(selections_list, list):
                 for sel in selections_list:
-                    if isinstance(sel, dict) and str(sel.get("marketId", "")) == mkt_id:
+                    if not isinstance(sel, dict):
+                        continue
+                    # Matchear por marketId o por id que contenga el mkt_id
+                    sel_mkt = str(sel.get("marketId", ""))
+                    sel_id = str(sel.get("id", ""))
+                    if sel_mkt == mkt_id or (mkt_id and mkt_id in sel_id):
                         mkt_sels.append(sel)
+            elif isinstance(selections_list, dict):
+                # events-table/v2 puede tener selections como dict keyed by marketId
+                sels = selections_list.get(mkt_id, [])
+                if isinstance(sels, list):
+                    mkt_sels = sels
+                elif isinstance(sels, dict):
+                    mkt_sels = [sels]
 
             if not mkt_sels:
+                logger.debug(f"    {home} vs {away}: mkt {mkt_id} ({template}) — 0 sels matched")
                 continue
 
+            logger.debug(f"    {home} vs {away}: mkt {mkt_id} ({template}) — {len(mkt_sels)} sels")
             self._classify_and_store(
                 template, mkt, mkt_sels, home, away, markets
             )
 
         if markets:
             soft_odds[event_id] = markets
+            logger.info(f"  ✓ {home} vs {away}: {markets}")
 
         events_info.append({
             "event_id": event_id,
