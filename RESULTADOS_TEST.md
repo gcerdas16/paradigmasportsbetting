@@ -149,6 +149,74 @@ Requests: 15 | Datos: 4499.7 KB | JSON: 5 (idéntico a primera corrida)
 
 ---
 
+### 2026-04-27 18:15 — Fix parser DoradoBet — FUNCIONA (20 eventos parseados)
+
+**Comando:** `cd paradigma && python -m scraping.doradobet_scraper`
+**Duración:** ~25 seg
+**Exit code:** 0
+
+**Output:**
+```
+Altenar data: 20 events, 103 markets, 261 odds
+DoradoBet: 20 eventos parseados, 20 con odds ✅
+
+Eventos (ligas regionales):
+  Mount Pleasant vs Waterhouse → h2h(2)
+  Inter San Carlos vs Pitbulls Santa Barbara FC → h2h(2)
+  Arema FC vs Persebaya Surabaya → h2h(2)
+  Perak vs Johor Darul Takzim II → h2h(2)
+  ... (Jamaica, Costa Rica, Indonesia, Malasia, Tailandia, Australia)
+```
+
+**Observaciones:** Parser fix correcto — ahora usa `marketIds`→`market.id`→`oddIds`→`odd.id`. Los 20 eventos son de ligas regionales (no europeas), por eso el emparejamiento con Pinnacle será 0. DoradoBet cubre ligas locales que Pinnacle no tiene.
+
+---
+
+### 2026-04-27 18:22 — Scanner combinado con DoradoBet fix — 1 VALUE BET, 15 NEAR MISSES
+
+**Comando:** `cd paradigma && python -m scraping.scanner_v2 --books 1xbet,melbet,doradobet`
+**Duración:** ~6 min
+**Exit code:** 0
+
+**Output:**
+```
+Pinnacle:    106 eventos
+1xBet:       156 eventos, 96 emparejados
+MelBet:      156 eventos, 96 emparejados
+DoradoBet:    20 eventos, 0 emparejados (ligas regionales sin overlap con Pinnacle)
+
+Por mercado (1xBet + MelBet → matched en Pinnacle):
+  h2h:     543 odds, 425 matched  (78%) ✅
+  spreads: 1416 odds, 734 matched (52%) ✅
+  totals:  1770 odds, 1522 matched (86%) ✅
+
+VALUE BETS: 1
+  #1 [h2h] Leeds United vs Burnley — Vie 01 May — 19:00 UTC
+     Burnley @ 7.900 (1xBet) | Pinnacle: 6.83 | EV: +7.12% | Kelly: 0.26%
+
+NEAR MISSES (EV 1-5%): 15
+  [spreads] Celta Vigo vs Elche        | Celta -1.5 @ 3.475    (Pin: 3.15) | EV: +3.96%
+  [spreads] Bologna vs Cagliari        | Bologna -1.5 @ 3.710  (Pin: 3.36) | EV: +3.65%
+  [spreads] Mainz 05 vs Union Berlin   | Mainz -1.5 @ 3.550    (Pin: 3.12) | EV: +3.36%
+  [h2h]     Union Berlin vs FC Koln    | Draw @ 3.595           (Pin: 3.36) | EV: +3.16%
+  [h2h]     Leeds vs Burnley           | Burnley @ 7.600        (Pin: 6.83) | EV: +3.05%
+  [h2h]     Brentford vs West Ham      | West Ham @ 3.775       (Pin: 3.53) | EV: +2.74%
+  [h2h]     Lecce vs Juventus          | Juventus @ 1.628       (Pin: 1.54) | EV: +2.14%
+  [spreads] Lecce vs Juventus          | Lecce 1.5 @ 1.649      (Pin: 1.56) | EV: +2.10%
+  [spreads] Auxerre vs Angers          | Auxerre -1.5 @ 3.625   (Pin: 3.34) | EV: +1.96%
+  [spreads] Real Betis vs Real Oviedo  | Oviedo 1.5 @ 1.533     (Pin: 1.47) | EV: +1.79%
+  [spreads] Bournemouth vs C. Palace   | C.Palace 1.5 @ 1.513   (Pin: 1.45) | EV: +1.68%
+  [h2h]     Arsenal vs Fulham          | Arsenal @ 1.495        (Pin: 1.44) | EV: +1.52%
+  [h2h]     Hellas Verona vs Como      | Como @ 1.514           (Pin: 1.44) | EV: +1.35%
+  [spreads] Barcelona vs Real Madrid   | R.Madrid 1.5 @ 1.501   (Pin: 1.43) | EV: +1.32%
+  [h2h]     Real Betis vs Real Oviedo  | Real Betis @ 1.656     (Pin: 1.60) | EV: +1.30%
+  Por mercado: {'spreads': 8, 'h2h': 7}
+```
+
+**Observaciones:** Pipeline completo con 3 casas funcionando. DoradoBet necesita que le configuren más ligas europeas en la URL de scraping para tener overlap con Pinnacle. La value bet de Burnley persiste en ambas corridas.
+
+---
+
 ### 2026-04-27 17:39 — Scanner combinado: 1xBet + MelBet + DoradoBet — 1 VALUE BET
 
 **Comando:** `cd paradigma && python -m scraping.scanner_v2 --books 1xbet,melbet,doradobet`
