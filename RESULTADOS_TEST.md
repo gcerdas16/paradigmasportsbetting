@@ -974,3 +974,68 @@ Los calls que sí se hacen son para los mercados destacados/exóticos que aparec
 
 **Archivos debug:**
 - `scraping_debug/betsafe_betsson_20260428_040823.json`
+
+---
+
+### 2026-04-27 22:15 — BetSafe re-test con league URLs + fix MHDA
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~2 min (navegó 7 ligas: UCL, UEL, EPL, La Liga, Bundesliga, Serie A, Ligue 1)
+**Exit code:** 0 — **0 eventos con odds**
+
+**Progreso:**
+- La navegación por ligas funciona correctamente ✅
+- Se capturaron 19 responses JSON ✅
+- Template `MW3W` SÍ aparece en `popular-bets/v1` ✅
+- Template `MHDA` NO existe en BetSafe ❌ (asunción incorrecta del dev)
+
+**Bugs nuevos identificados:**
+
+**Bug 1: URL filter demasiado estricto**
+```python
+# Código actual — excluye popular-bets
+if "event-market" not in url and "view" not in url:
+    continue
+# Fix: incluir también popular-bets y popular-pre-built-bets
+if not any(x in url for x in ["event-market", "view", "popular-bets"]):
+    continue
+```
+
+**Bug 2: Template 1X2 equivocado**
+```python
+# Código actual (MHDA no existe en BetSafe):
+is_h2h = template in ("MHDA", "FT1X2", "1X2")
+# Fix: usar MW3W
+is_h2h = template in ("MW3W", "MHDA", "FT1X2", "1X2")
+```
+
+**Bug 3 (raíz del problema): `popular-bets/v1` tiene MW3W markets pero sin selections**
+```
+MW3W markets encontrados: 2
+  m-f-ntJBTtSXjEqKaCWv2Yasng-MW3W  → Stockport vs Port Vale
+  m-f-Ktp6sppDm02O23QgYDNymA-MW3W  → (otro evento)
+marketSelections en popular-bets/v1: 0  ← vacío, sin odds
+```
+
+Las odds de MW3W NUNCA se cargan con la navegación actual. BetSafe solo carga las odds del 1X2 cuando se hace un request explícito a:
+```
+GET /api/sb/v1/widgets/event-market/v1?marketids=m-f-{eventId}-MW3W,...
+```
+
+**Solución propuesta (para el dev):**
+El scraper debe construir y hacer los requests de MW3W explícitamente, usando page.evaluate() o route interception en Playwright:
+
+```python
+# Paso 1: recopilar eventIds con MW3W desde popular-bets/v1 o view/v1
+mw3w_event_ids = ["f-lGGIMROeykmUeY-bc5dXoA", "f-ntJBTtSXjEqKaCWv2Yasng", ...]
+
+# Paso 2: construir market IDs
+mw3w_market_ids = [f"m-f-{eid}-MW3W" for eid in mw3w_event_ids]
+
+# Paso 3: hacer el request explícito (via fetch en page.evaluate)
+url = f"/api/sb/v1/widgets/event-market/v1?includescoreboards=true&marketids={','.join(mw3w_market_ids)}"
+response = await page.evaluate(f"fetch('{url}').then(r => r.json())")
+# → Esto debería devolver events + markets + marketSelections con odds MW3W
+```
+
+**Archivos debug:** `scraping_debug/betsafe_betsson_20260428_041403.json`
