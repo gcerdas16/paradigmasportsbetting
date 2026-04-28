@@ -1162,3 +1162,68 @@ LEAGUE_URLS funcionando: NO (slugs incorrectos probablemente)
    - ¿Cuál es el label exacto del Empate?
 2. Reemplazar navegación directa a LEAGUE_URLS por navegación programática (click en ligas desde el menú)
 3. O hardcodear `competitionIds` y llamar events-table/v2 directamente (requiere saber los IDs de cada liga)
+
+---
+
+### 2026-04-27 23:25 — BetSafe v5: navegación dinámica de ligas + selection matching robusto
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~2 min
+**Exit code:** 0
+
+**Output:**
+```
+BetSafe: 41 API responses capturadas
+BetSafe: 12 eventos con odds
+
+  Stockport vs Port Vale       → Liga: Inglaterra League One → h2h: Stockport:1.37 (solo 1 sel)
+  Libertad vs Independiente    → Liga: Copa Libertadores     → h2h: IndependienteDelValle:2.68 (solo 1 sel)
+  Sevilla vs Real Sociedad     → Liga: España La Liga → h2h: 2.48 / 3.45 / 2.82 ✅
+  Villarreal vs Levante        → Liga: España La Liga → h2h: 1.68 / 4.25 / 4.45 ✅
+  Valencia vs Atlético Madrid  → Liga: España La Liga → h2h: 1.95 / 3.70 / 3.70 ✅
+  Alaves vs Athletic Bilbao    → Liga: España La Liga → h2h: 2.68 / 3.45 / 2.58 ✅
+  Osasuna vs Barcelona         → Liga: España La Liga → h2h: 4.45 / 3.70 / 1.82 ✅
+  Celta Vigo vs Elche          → Liga: España La Liga → h2h: 1.82 / 3.70 / 4.45 ✅
+  Getafe vs Rayo Vallecano     → Liga: España La Liga → h2h: 2.02 / 3.25 / 3.95 ✅
+  Real Betis vs Oviedo         → Liga: España La Liga → h2h: 1.60 / 4.15 / 5.40 ✅
+  Espanyol vs Real Madrid      → Liga: España La Liga → h2h: 4.95 / 3.70 / 1.75 ✅
+  Girona vs Mallorca           → Liga: España La Liga → h2h: 2.02 / 3.45 / 3.70 ✅
+```
+
+**Progreso vs v4:** v4 tenía 2 eventos con 1 selección c/u → v5 tiene **12 eventos, La Liga completa con 3 selecciones** ✅
+
+**Análisis del log — lo que funcionó y lo que falla:**
+
+Link discovery encontró 7 links. Liga navegada correctamente:
+```
+✅ espana-la-liga          → events-table/v2 disparó 4 veces → 10 partidos La Liga ✅
+⚠️ inglaterra-premier-league → navigó OK pero 0 events-table/v2 registrados
+⚠️ italia-serie-a          → navegó OK pero 0 events-table/v2 registrados
+❌ paris-sg-bayern-de-munich?eventId=... → PARTIDO INDIVIDUAL, no liga
+⚠️ francia-ligue-1         → navegó OK pero 0 events-table/v2 registrados
+❌ southampton-ipswich      → PARTIDO INDIVIDUAL, no liga
+❌ paris-sg-bayern-de-munich → PARTIDO INDIVIDUAL, no liga
+```
+
+**Bug 1 (principal) — Link discovery captura páginas de partidos individuales:**
+- El selector `a[href*="/futbol/"]` encuentra todos los links incluyendo links de partidos
+- Ej: `paris-sg-bayern-de-munich?eventId=f-lGGIMROeykmUeY-bc5dXoA` matchea `"ligue 1"` → "ligue" está en algún texto cercano
+- `southampton-ipswich` matchea `"premier"` → texto del link contiene "Premier League"
+- Fix recomendado: filtrar links que tengan 2 o más `/` después de `/futbol/` (son partidos) vs exactamente 1 `/` (son ligas):
+  ```python
+  # Liga:   /futbol/la-liga           → 1 segmento después de /futbol/
+  # Partido: /futbol/la-liga/partido  → 2 segmentos → excluir
+  ```
+  O mejor: buscar links con clase CSS de navegación del sidebar (no los de las cards de partidos)
+
+**Bug 2 — EPL/Serie A/Ligue 1 navegan pero events-table/v2 no se intercepta:**
+- Posible causa: browser caching hace que events-table/v2 no vuelva a disparar para ligas ya cacheadas
+- O: el `wait_until="networkidle"` finaliza antes de que events-table/v2 complete (race condition)
+- Fix recomendado: agregar `page.wait_for_response(lambda r: "events-table" in r.url, timeout=10000)` después de cada navegación de liga
+
+**Bug 3 — Stockport/Libertad siguen con 1 selección:**
+- Estos vienen del `event-market/v1` (liveAndUpcoming inicial), no de `events-table/v2`
+- `event-market/v1` usa `marketSelections` con estructura diferente → HOME/DRAW/AWAY no están en esas responses
+- Son ligas menores (League One, Copa Libertadores) — baja prioridad, no van a matchear con Pinnacle
+
+**Debug:** `scraping_debug/betsafe_betsson_20260428_052712.json`
