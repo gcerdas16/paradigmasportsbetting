@@ -38,7 +38,38 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 22:05 — FIX PARSERS: 888sport (decimal_price) + BetSafe (label, lists, league URLs)
+### 🔴 2026-04-27 22:50 — FIX v3: 888sport EU leagues + BetSafe MW3W explicit fetch
+
+**Basado en test 22:10:** 888sport OK (11 eventos) pero solo ligas regionales. BetSafe 0 eventos — MW3W nunca se carga.
+
+**Fixes:**
+
+**888sport:**
+- Agregadas 7 URLs de ligas europeas (UCL, UEL, EPL, La Liga, etc.)
+- Antes: solo 11 eventos de Indonesia/Bangladesh
+- Esperado: 30-50+ eventos con overlap a Pinnacle
+
+**BetSafe (3 fixes):**
+1. URL filter ahora incluye `popular-bets` (antes solo `event-market`/`view`)
+2. Template `MW3W` agregado como 1X2 (antes solo `MHDA` que no existe)
+3. **NUEVO: fetch explícito de MW3W** — después de navegar ligas, recopila eventIds con MW3W y hace `page.evaluate(fetch(...))` para obtener las odds 1X2
+
+**Test:**
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book 888sport --no-headless
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+- 888sport: ¿más eventos de ligas europeas?
+- BetSafe: "Fetching N mercados MW3W explícitamente..." → "MW3W batch 1: OK" → eventos con h2h?
+- Si MW3W fetch falla → pegar error
+
+---
+
+### ✅ 2026-04-27 22:05 — FIX PARSERS: 888sport (decimal_price) + BetSafe (label, lists, league URLs)
 
 **Basado en los resultados de test de las 22:00.** Ambos scrapers conectan y capturan datos pero parsean 0 eventos.
 
