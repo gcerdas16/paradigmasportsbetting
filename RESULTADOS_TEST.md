@@ -903,3 +903,74 @@ marketSelections[0]["label"] = "Paris SG"
 ```
 
 **Archivo debug:** `scraping_debug/betsafe_betsson_20260428_035613.json`
+
+---
+
+### 2026-04-27 22:10 — Re-test scrapers con fixes aplicados
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book 888sport/betsafe --no-headless`
+
+---
+
+#### 888sport — ✅ 11 eventos con odds (FIX FUNCIONÓ)
+
+```
+888sport — Eventos con odds: 11
+Todos h2h, ligas regionales (Indonesia principalmente):
+  Semen Padang vs Madura Utd — Draw:3.00, Madura Utd:2.80, Semen Padang:2.30
+  Yogyakarta vs Persita Tangerang — Draw:3.10, Yogyakarta:2.10, Persita:3.10
+  Dewa Utd vs Persijap Jepara — Draw:3.60, Dewa Utd:1.67, Persijap:4.40
+  PSBS Biak vs Malut United — Draw:11.0, PSBS:26.0, Malut:1.06 (odds extrañas)
+  ...
+```
+
+Fix funcionó: `decimal_price` ahora reconocido, `selections` iteradas correctamente.
+**Problema pendiente:** Solo captura 5-11 eventos de ligas regionales (Bangladesh, Indonesia).
+No captura Europa (Premier League, Champions League). URL `/futbol/` solo muestra partidos del día con pocas ligas.
+Necesita navegar a ligas europeas específicas para tener overlap con Pinnacle.
+
+---
+
+#### BetSafe — ❌ 0 eventos con odds (fix parcial — nuevo bug identificado)
+
+```
+BetSafe — Eventos con odds: 0
+44 API responses capturadas
+Eventos detectados correctamente: AL Khaleej - AL Najma, Paris SG - Bayern, Atlético - Arsenal...
+home/away parsean bien ahora (participants[i]["label"] ✅)
+markets_list/selections_list lookup funciona ✅
+```
+
+**Causa real:** Los mercados capturados son TODOS secundarios — ninguno es 1X2 (MW3W).
+
+**Templates capturados por response:**
+```
+81KB  → HTG, GIBH, MGT, HWTN, MWBTTS  (sin 1X2)
+99KB  → ATG, BTTSOU, FTCSR, HTCS, MGT  (sin 1X2)
+166KB → 1HTC, 1HTG, AGSNAB, BTTS1H    (sin 1X2)
+249KB → AGSNAB, AWEH, BTTS1H, DC       (sin 1X2)
+237KB → AGSNAB, ATCS, ATG, AWEH        (sin 1X2)
+```
+
+**Hallazgo clave:** El template 1X2 de BetSafe es **`MW3W`** (Match Winner 3-Way).
+Aparece en `view/v1` como `"marketTemplateIds": ["MW3W"]` con estos event IDs:
+```
+f-lGGIMROeykmUeY-bc5dXoA  (Paris SG vs Bayern)
+f-ntJBTtSXjEqKaCWv2Yasng
+f-Ktp6sppDm02O23QgYDNymA
+f-AtKKfD3qJUK0rl69RvBi0A
+f-k7gRCxbd2k62CqnXc4bnSQ
+```
+
+Pero el `event-market/v1?marketids=m-f-{id}-MW3W` NUNCA se llama durante el scraping.
+Los calls que sí se hacen son para los mercados destacados/exóticos que aparecen en la UI principal.
+
+**Solución propuesta:** El scraper debe:
+1. Parsear el `view/v1` para extraer los eventIds con `marketTemplateIds: ["MW3W"]`
+2. Construir explícitamente el market ID: `m-f-{eventId}-MW3W`
+3. Hacer el request directo:
+   `GET /api/sb/v1/widgets/event-market/v1?marketids=m-f-{eventId}-MW3W`
+   Esto se puede hacer vía Playwright (`page.evaluate`) o interceptando la respuesta.
+
+**Archivos debug:**
+- `scraping_debug/betsafe_betsson_20260428_040823.json`
