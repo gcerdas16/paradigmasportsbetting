@@ -38,7 +38,42 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 22:50 — FIX v3: 888sport EU leagues + BetSafe MW3W explicit fetch
+### 🔴 2026-04-27 23:25 — FIX v5: BetSafe navegación dinámica de ligas + selection matching robusto
+
+**Basado en test 23:10:** BetSafe pasó de 0→2 eventos, pero solo captura 1 selección de 3, y 0 ligas europeas.
+
+**Qué se corrigió:**
+
+1. **Navegación dinámica** — Ya NO usa URLs hardcodeadas (slugs eran incorrectos). Ahora busca links `<a href>` en la página con keywords (`champions`, `premier`, `la liga`, etc.) y navega a cada uno.
+2. **Selection matching robusto** — Ahora matchea selections por `marketId`, por `id` que contenga el market ID, y por dict keys (en caso de que `events-table/v2` use dict en vez de lista).
+3. **Logging diagnóstico** — Imprime `✓ Home vs Away: {markets}` por cada evento parseado.
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar en el output:**
+1. `"Encontradas N ligas en el menú"` — ¿N > 0? Si es 0, los links de liga no se encuentran con los keywords actuales
+2. `"Navegando a liga: xxx"` — ¿Navega a UCL, EPL, La Liga, etc.?
+3. `"✓ Home vs Away: {h2h: ...}"` — ¿Aparecen eventos con 3 selecciones (home, Draw, away)?
+4. `"BetSafe — Eventos con odds: N"` — ¿N > 2?
+
+**Si N ligas = 0:** Pegar en RESULTADOS_TEST.md la lista de links `<a>` visibles en la página de fútbol de BetSafe. Podés inspeccionarlo con DevTools → `document.querySelectorAll('a[href*="/futbol/"]')`.
+
+**Si eventos > 2 pero solo 1 selección por evento:** Revisar en el debug JSON (`scraping_debug/betsafe_*.json`) un evento MW3W y pegar la estructura de `selections` para ese market. Necesito ver el field name exacto que vincula selection→market.
+
+**Si todo funciona:** Correr el scanner completo:
+```bash
+python -m scraping.scanner_v2 --books 1xbet,888sport,betsafe
+```
+
+---
+
+### ✅ 2026-04-27 22:50 — FIX v3: 888sport EU leagues + BetSafe MW3W explicit fetch
 
 **Basado en test 22:10:** 888sport OK (11 eventos) pero solo ligas regionales. BetSafe 0 eventos — MW3W nunca se carga.
 
