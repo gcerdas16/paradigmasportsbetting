@@ -38,7 +38,31 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 23:25 — FIX v5: BetSafe navegación dinámica de ligas + selection matching robusto
+### 🔴 2026-04-27 23:35 — FIX v6: BetSafe filtrar links de partidos + wait_for_response events-table
+
+**Basado en test 23:25:** 12 eventos con La Liga completa ✅. Pero link discovery captura partidos individuales y EPL/Serie A/Ligue 1 no disparan events-table.
+
+**Fixes:**
+1. **Filtro de links** — Solo acepta links con 1 segmento tras `/futbol/` (ligas). Links con 2+ segmentos (partidos individuales como `paris-sg-bayern-de-munich`) se descartan.
+2. **wait_for_response** — Después de navegar a cada liga, espera explícitamente a que `events-table` responda (hasta 10s). Esto evita race conditions donde `networkidle` termina antes de que la API responda.
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"Encontradas N ligas en el menú"` — N debería ser menor que v5 (sin partidos individuales)
+2. `"events-table interceptado para xxx"` — ¿Aparece para EPL, Serie A, Ligue 1?
+3. `"BetSafe — Eventos con odds: N"` — ¿N > 12? (La Liga + EPL + más ligas)
+4. Si EPL/Serie A siguen sin events-table → pegar el log completo
+
+---
+
+### ✅ 2026-04-27 23:25 — FIX v5: BetSafe navegación dinámica de ligas + selection matching robusto
 
 **Basado en test 23:10:** BetSafe pasó de 0→2 eventos, pero solo captura 1 selección de 3, y 0 ligas europeas.
 

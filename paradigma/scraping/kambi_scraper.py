@@ -402,6 +402,15 @@ class BetSafeScraper:
                 for link in all_links:
                     href = link.get_attribute("href") or ""
                     text = (link.inner_text() or "").lower()
+                    # Filtrar: solo links de liga (1 segmento tras /futbol/)
+                    # Liga:    /futbol/espana-la-liga         → OK
+                    # Partido: /futbol/espana-la-liga/partido → SKIP
+                    path = href.split("?")[0].rstrip("/")
+                    futbol_idx = path.find("/futbol/")
+                    if futbol_idx >= 0:
+                        after = path[futbol_idx + len("/futbol/"):]
+                        if "/" in after:
+                            continue  # es un partido individual, skip
                     for kw in self.LEAGUE_KEYWORDS:
                         if kw in text or kw in href.lower():
                             full_url = href if href.startswith("http") else f"https://www.betsafe.com{href}"
@@ -411,11 +420,21 @@ class BetSafeScraper:
                 logger.info(f"  Encontradas {len(league_hrefs)} ligas en el menú")
                 for lh in league_hrefs:
                     try:
-                        logger.info(f"  Navegando a liga: {lh.split('/')[-1]}")
+                        slug = lh.split("/")[-1].split("?")[0]
+                        logger.info(f"  Navegando a liga: {slug}")
                         page.goto(lh, wait_until="networkidle",
                                  timeout=self.timeout_ms)
-                        page.wait_for_timeout(3_000)
-                        for _ in range(3):
+                        # Esperar explícitamente a que events-table se cargue
+                        try:
+                            page.wait_for_response(
+                                lambda r: "events-table" in r.url and r.status == 200,
+                                timeout=10_000
+                            )
+                            logger.info(f"    events-table interceptado para {slug}")
+                        except Exception:
+                            logger.info(f"    events-table no disparó para {slug} (puede ser cache)")
+                        page.wait_for_timeout(2_000)
+                        for _ in range(2):
                             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                             page.wait_for_timeout(1_500)
                     except Exception as e:
