@@ -1227,3 +1227,48 @@ Link discovery encontró 7 links. Liga navegada correctamente:
 - Son ligas menores (League One, Copa Libertadores) — baja prioridad, no van a matchear con Pinnacle
 
 **Debug:** `scraping_debug/betsafe_betsson_20260428_052712.json`
+
+---
+
+### 2026-04-27 23:39 — BetSafe v6: filtro 1 segmento + wait_for_response — REGRESIÓN (0 ligas)
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~1 min
+**Exit code:** 0
+
+**Output:**
+```
+BetSafe: 19 API responses capturadas
+Encontradas 0 ligas en el menú   ← REGRESIÓN
+BetSafe: 2 eventos con odds (Stockport, Libertad — mismo que v4)
+```
+
+**Diagnóstico:**
+
+El filtro de 1 segmento es correcto lógicamente, pero el selector `a[href*="/futbol/"]` devuelve **0 elementos**. En v5 devolvía 7.
+
+**Causa probable — locale vs idioma de links:**
+- El Playwright context tiene `locale="en-US"`
+- BetSafe navega a URL española `/es/apuestas-deportivas/futbol/...`
+- Pero los links internos que genera la página podrían usar `/football/` (inglés) en lugar de `/futbol/`
+- Si los hrefs son `/en/sports-betting/football/la-liga`, el selector `a[href*="/futbol/"]` no los encuentra
+
+**Fix sugerido — buscar ambos idiomas:**
+```python
+# En vez de:
+all_links = page.query_selector_all('a[href*="/futbol/"]')
+# Usar:
+all_links = (page.query_selector_all('a[href*="/futbol/"]') or
+             page.query_selector_all('a[href*="/football/"]'))
+```
+
+**O agregar diagnóstico para confirmar:**
+```python
+# Antes de query_selector_all, loggear cuántos links totales hay:
+total = len(page.query_selector_all('a[href]'))
+futbol = len(page.query_selector_all('a[href*="futbol"]'))
+football = len(page.query_selector_all('a[href*="football"]'))
+logger.info(f"  Links totales: {total}, /futbol/: {futbol}, /football/: {football}")
+```
+
+**Debug:** `scraping_debug/betsafe_betsson_20260428_053959.json`
