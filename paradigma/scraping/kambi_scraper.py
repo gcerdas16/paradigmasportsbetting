@@ -55,6 +55,17 @@ class Sport888Scraper:
     FOOTBALL_URL = "https://www.888sport.es/futbol/"
     API_DOMAIN = "spectate-web.888sport.es"
 
+    # Ligas europeas para capturar más eventos (overlap con Pinnacle)
+    LEAGUE_URLS = [
+        "https://www.888sport.es/futbol/champions-league/",
+        "https://www.888sport.es/futbol/europa-league/",
+        "https://www.888sport.es/futbol/premier-league/",
+        "https://www.888sport.es/futbol/la-liga/",
+        "https://www.888sport.es/futbol/bundesliga/",
+        "https://www.888sport.es/futbol/serie-a/",
+        "https://www.888sport.es/futbol/ligue-1/",
+    ]
+
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
         self.headless = headless
         self.timeout_ms = timeout_ms
@@ -108,26 +119,25 @@ class Sport888Scraper:
                 logger.warning(f"  Timeout en carga: {e}")
 
             # Scroll para cargar más eventos
-            for _ in range(5):
+            for _ in range(3):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2_000)
 
-            # Intentar clics en ligas populares
-            try:
-                league_links = page.query_selector_all(
-                    'a[href*="premier"], a[href*="liga"], a[href*="bundesliga"], '
-                    'a[href*="serie-a"], a[href*="ligue"]'
-                )
-                for link in league_links[:5]:
-                    try:
-                        link.click()
-                        page.wait_for_timeout(3_000)
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+            # Navegar a ligas europeas para capturar más eventos
+            for league_url in self.LEAGUE_URLS:
+                try:
+                    logger.info(f"  888sport liga: {league_url.split('/')[-2]}")
+                    page.goto(league_url, wait_until="networkidle",
+                             timeout=self.timeout_ms)
+                    page.wait_for_timeout(3_000)
+                    for _ in range(2):
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        page.wait_for_timeout(1_500)
+                except Exception as e:
+                    logger.warning(f"  Error en liga 888: {e}")
+                    continue
 
-            page.wait_for_timeout(3_000)
+            page.wait_for_timeout(2_000)
             browser.close()
 
         logger.info(f"  888sport: {len(api_responses)} API responses capturadas")
@@ -406,6 +416,37 @@ class BetSafeScraper:
                     continue
 
             page.wait_for_timeout(2_000)
+
+            # ── Paso clave: fetch explícito de MW3W (1X2) ──
+            # BetSafe no carga odds 1X2 automáticamente — hay que pedirlas
+            mw3w_ids = self._collect_mw3w_market_ids(api_responses)
+            if mw3w_ids:
+                logger.info(f"  Fetching {len(mw3w_ids)} mercados MW3W explícitamente...")
+                # Hacer en batches de 20 para no sobrecargar
+                for i in range(0, len(mw3w_ids), 20):
+                    batch = mw3w_ids[i:i+20]
+                    ids_param = ",".join(batch)
+                    fetch_url = f"/api/sb/v1/widgets/event-market/v1?includescoreboards=true&marketids={ids_param}"
+                    try:
+                        result = page.evaluate(f"""
+                            fetch('{fetch_url}')
+                                .then(r => r.json())
+                                .catch(e => ({{ error: e.message }}))
+                        """)
+                        if isinstance(result, dict) and "error" not in result:
+                            api_responses.append({
+                                "url": f"https://www.betsafe.com{fetch_url}",
+                                "data": result,
+                                "size_kb": 0,
+                            })
+                            logger.info(f"  MW3W batch {i//20+1}: OK")
+                        else:
+                            logger.warning(f"  MW3W batch {i//20+1}: {result}")
+                    except Exception as e:
+                        logger.warning(f"  MW3W fetch error: {e}")
+            else:
+                logger.info("  No se encontraron market IDs MW3W para fetch")
+
             browser.close()
 
         logger.info(f"  BetSafe: {len(api_responses)} API responses capturadas")
@@ -418,6 +459,55 @@ class BetSafeScraper:
         logger.info(f"  BetSafe: {len(soft_odds)} eventos con odds")
         return soft_odds, events_info
 
+    @staticmethod
+    def _collect_mw3w_market_ids(responses: list[dict]) -> list[str]:
+        """
+        Busca en responses interceptadas los event IDs que tienen MW3W
+        y construye los market IDs para fetch explícito.
+        """
+        mw3w_ids = set()
+
+        for resp in responses:
+            data = resp.get("data", {})
+            if not isinstance(data, dict):
+                continue
+            inner = data.get("data", data)
+            if not isinstance(inner, dict):
+                continue
+
+            # Buscar en markets (lista) los que tengan marketTemplateId MW3W
+            markets = inner.get("markets", [])
+            if isinstance(markets, list):
+                for mkt in markets:
+                    if isinstance(mkt, dict):
+                        tmpl = str(mkt.get("marketTemplateId", "")).upper()
+                        if tmpl == "MW3W":
+                            mid = mkt.get("id", "")
+                            if mid:
+                                mw3w_ids.add(str(mid))
+
+            # Buscar en events que tengan marketTemplateIds incluyendo MW3W
+            events = inner.get("events", [])
+            if isinstance(events, list):
+                for evt in events:
+                    if not isinstance(evt, dict):
+                        continue
+                    templates = evt.get("marketTemplateIds", [])
+                    if isinstance(templates, list) and "MW3W" in templates:
+                        eid = evt.get("id", "")
+                        if eid:
+                            # Construir market ID: m-{eventId}-MW3W
+                            mw3w_ids.add(f"m-{eid}-MW3W")
+            elif isinstance(events, dict):
+                for eid, evt in events.items():
+                    if not isinstance(evt, dict):
+                        continue
+                    templates = evt.get("marketTemplateIds", [])
+                    if isinstance(templates, list) and "MW3W" in templates:
+                        mw3w_ids.add(f"m-{eid}-MW3W")
+
+        return list(mw3w_ids)
+
     def _parse_betsson(self, responses: list[dict]) -> tuple[dict, list[dict]]:
         """Parsea respuestas de la API Betsson de BetSafe."""
         soft_odds = {}
@@ -428,8 +518,8 @@ class BetSafeScraper:
             url = resp["url"]
             data = resp["data"]
 
-            # El endpoint principal es event-market/v1
-            if "event-market" not in url and "view" not in url:
+            # Endpoints relevantes: event-market, view, popular-bets
+            if not any(x in url for x in ["event-market", "view", "popular-bets"]):
                 continue
 
             if not isinstance(data, dict):
@@ -570,7 +660,7 @@ class BetSafeScraper:
         mkt_name = str(mkt.get("name") or mkt.get("marketName") or "").lower()
 
         # Clasificar por template ID
-        is_h2h = template in ("MHDA", "FT1X2", "1X2")
+        is_h2h = template in ("MW3W", "MHDA", "FT1X2", "1X2")
         is_total = template in ("MWOU", "OU", "FTOU")
         is_spread = template in ("AGSNAB", "AH", "FTAH", "HC")
 
