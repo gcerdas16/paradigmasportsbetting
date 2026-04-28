@@ -32,7 +32,36 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 18:05 — Fix parser DoradoBet (relaciones por ID)
+### 🔴 2026-04-27 18:35 — Buscar URLs de ligas europeas en DoradoBet
+
+**NO es código, es manual en el navegador.**
+
+1. Abrir `https://doradobet.com` en Chrome
+2. Ir a la sección de fútbol
+3. Buscar cada liga y copiar la URL del address bar:
+
+| Liga | Buscar como... | URL |
+|---|---|---|
+| England Premier League | Premier League, EPL, England | |
+| Spain La Liga | La Liga, España | |
+| Germany Bundesliga | Bundesliga, Alemania | |
+| Italy Serie A | Serie A, Italia | |
+| France Ligue 1 | Ligue 1, Francia | |
+| UEFA Champions League | Champions League, UCL | |
+| UEFA Europa League | Europa League, UEL | |
+
+4. Pegar las 7 URLs en `RESULTADOS_TEST.md` y push
+
+**Ejemplo de lo que necesito:**
+```
+Premier League → https://doradobet.com/deportes/66/123
+La Liga → https://doradobet.com/deportes/66/456
+...etc
+```
+
+---
+
+### ✅ 2026-04-27 18:05 — Fix parser DoradoBet (relaciones por ID)
 
 **Qué cambió:**
 1. **doradobet_scraper.py** — Fix completo del parser. Ahora usa las relaciones correctas:
