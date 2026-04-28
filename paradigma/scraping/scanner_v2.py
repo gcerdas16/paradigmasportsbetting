@@ -46,15 +46,13 @@ import config
 from ev_calculator import find_value_bets
 from scraping.pinnacle_scraper import PinnacleScraper
 from scraping.onexbet_scraper import OneXBetScraper, BOOK_CONFIGS as BETB2B_CONFIGS
-from scraping.kambi_scraper import KambiScraper, BOOK_CONFIGS as KAMBI_CONFIGS
-from scraping.bet365_scraper import Bet365Scraper
+from scraping.kambi_scraper import create_scraper as create_kambi_scraper, BOOK_CONFIGS as KAMBI_CONFIGS
 from scraping.event_matcher import match_events, names_match
 
 # Registro unificado de todas las casas disponibles
 ALL_BOOKS = {
     **{k: v["name"] for k, v in BETB2B_CONFIGS.items()},
     **{k: v["name"] for k, v in KAMBI_CONFIGS.items()},
-    "bet365": "Bet365",
 }
 
 logger = logging.getLogger(__name__)
@@ -114,10 +112,7 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
                 scraper = OneXBetScraper(headless=headless, book_key=book_key)
                 soft_data, soft_events = scraper.scrape_football_odds()
             elif book_key in KAMBI_CONFIGS:
-                scraper = KambiScraper(book_key=book_key)
-                soft_data, soft_events = scraper.scrape_football_odds()
-            elif book_key == "bet365":
-                scraper = Bet365Scraper(headless=headless)
+                scraper = create_kambi_scraper(book_key=book_key, headless=headless)
                 soft_data, soft_events = scraper.scrape_football_odds()
             else:
                 logger.warning(f"   Casa '{book_key}' no reconocida. Opciones: {list(ALL_BOOKS.keys())}")

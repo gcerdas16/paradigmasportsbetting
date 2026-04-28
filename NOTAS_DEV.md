@@ -25,10 +25,10 @@
 | 1xBet scraper | ✅ Funcionando (155 eventos) |
 | MelBet scraper | ✅ Mismo engine que 1xBet |
 | 20Bet scraper | ✅ Mismo engine que 1xBet |
-| 888sport scraper (Kambi) | 🔴 NUEVO — Por testear |
-| Unibet scraper (Kambi) | 🔴 NUEVO — Por testear |
-| BetSafe scraper (Kambi/Betsson) | 🔴 NUEVO — Por testear |
-| Bet365 scraper | 🔴 NUEVO — Por testear |
+| 888sport scraper (Spectate) | 🔴 REESCRITO — Por testear v2 |
+| BetSafe scraper (Betsson API) | 🔴 REESCRITO — Por testear v2 |
+| Bet365 | ❌ DESCARTADO — protocolo binario OCP, no viable |
+| Unibet | ❌ Sin scraper aún (Kambi CDN bloqueado) |
 | Event matcher | ✅ Limpio (94 emparejados, Bookings excluidos) |
 | EV calc — h2h | ✅ Funcionando (7 near misses detectados) |
 | EV calc — totals | ✅ Funcionando (1 near miss, 750 matched) |
@@ -38,7 +38,55 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 21:20 — 4 scrapers nuevos: Kambi (888sport, Unibet, BetSafe) + Bet365
+### 🔴 2026-04-27 21:45 — REESCRITO: 888sport (Spectate) + BetSafe (Betsson API) — Playwright
+
+**Contexto:** Los tests de la v1 revelaron:
+- `eu-offering.kambicdn.org` está completamente bloqueado (timeout)
+- 888sport migró de Kambi a plataforma "Spectate" propia
+- BetSafe usa su propia API proxy de Betsson, no el CDN público de Kambi
+- Bet365 usa protocolo binario OCP — no es scrappeable sin ingeniería inversa
+
+**Qué cambió:**
+1. **`scraping/kambi_scraper.py` REESCRITO COMPLETO** — Ya NO usa HTTP a Kambi CDN
+   - **888sport**: Intercepta API Spectate (`spectate-web.888sport.es`)
+   - **BetSafe**: Intercepta API Betsson (`www.betsafe.com/api/sb/v1/`)
+   - Ambos usan Playwright (igual que 1xBet/Pinnacle)
+2. **`scanner_v2.py`** actualizado — usa factory `create_scraper()`
+3. **Bet365 DESCARTADO** — protocolo binario, no viable
+4. **Unibet sin scraper** — Kambi CDN bloqueado, no sabemos su API real
+
+**Casas disponibles:** `1xbet`, `melbet`, `20bet`, `888sport`, `betsafe`
+
+**Comandos de test (con browser VISIBLE recomendado para primer test):**
+
+```bash
+cd paradigma
+
+# 888sport sola (Spectate)
+python -m scraping.kambi_scraper --book 888sport --no-headless
+
+# BetSafe sola (Betsson API)
+python -m scraping.kambi_scraper --book betsafe --no-headless
+
+# Scanner combinado (si funcionan):
+python -m scraping.scanner_v2 --books 1xbet,888sport,betsafe
+
+# ALL-IN (5 casas):
+python -m scraping.scanner_v2 --books 1xbet,melbet,20bet,888sport,betsafe
+```
+
+**Qué buscar:**
+1. ¿Captura respuestas JSON de `spectate-web.888sport.es`?
+2. ¿Captura respuestas JSON de `www.betsafe.com/api/sb/v1/`?
+3. ¿Parsea eventos con nombres de equipo?
+4. Revisar archivos debug en `scraping_debug/` para analizar estructura real
+5. Si 0 eventos → pegar el debug JSON para que yo ajuste el parser
+
+**Pegar en RESULTADOS_TEST.md:** Output de cada scraper + archivos debug relevantes.
+
+---
+
+### ✅ 2026-04-27 21:20 — (v1 OBSOLETA) 4 scrapers nuevos: Kambi (888sport, Unibet, BetSafe) + Bet365
 
 **Qué cambió:**
 1. **Nuevo: `scraping/kambi_scraper.py`** — Scraper para casas Kambi via API REST pública

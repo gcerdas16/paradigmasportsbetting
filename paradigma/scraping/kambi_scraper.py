@@ -1,455 +1,705 @@
 """
-Scraper para casas Kambi (888sport, Unibet, etc.)
+Scrapers para 888sport y BetSafe.
 
-La plataforma Kambi expone una API REST pública en eu-offering.kambicdn.org
-que NO requiere Playwright ni autenticación. Solo HTTP requests simples.
+Descubrimiento via API sniffer (2026-04-27):
+    - 888sport migró de Kambi a plataforma "Spectate" propia
+      API: spectate-web.888sport.es
+    - BetSafe (grupo Betsson) usa su propia API proxy
+      API: www.betsafe.com/api/sb/v1/
+    - El CDN público de Kambi (eu-offering.kambicdn.org) está bloqueado/inaccesible
 
-Casas confirmadas sobre Kambi:
-    888sport  →  operador "888"
-    Unibet    →  operador "ub"
+Ambos requieren Playwright para interceptar las respuestas JSON.
 
 Uso:
-    from paradigma.scraping.kambi_scraper import KambiScraper
-    scraper = KambiScraper(book_key="888sport")
+    from paradigma.scraping.kambi_scraper import Sport888Scraper, BetSafeScraper
+    scraper = Sport888Scraper()
     soft_odds, events_info = scraper.scrape_football_odds()
 """
 
 import json
 import logging
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import requests
-
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Constantes
-# ---------------------------------------------------------------------------
+DEBUG_DIR = Path("scraping_debug")
 
-KAMBI_BASE_URL = "https://eu-offering.kambicdn.org/offering/v2018"
-
-# Configuración por casa de apuestas
-# Nota: 888sport podría haber migrado fuera de Kambi (verificar con test).
-# BetSafe es del grupo Betsson → cubre la casa prioritaria "Betsson".
+# Registro de casas para scanner_v2
 BOOK_CONFIGS = {
     "888sport": {
         "name": "888sport",
-        "operator": "888",
-    },
-    "unibet": {
-        "name": "Unibet",
-        "operator": "ub",
+        "scraper_class": "Sport888Scraper",
     },
     "betsafe": {
         "name": "BetSafe",
-        "operator": "betsafe",
+        "scraper_class": "BetSafeScraper",
     },
 }
 
-# Categorías de mercado Kambi
-# Cada category ID mapea a un tipo de apuesta
-MARKET_CATEGORIES = {
-    "h2h": 12579,       # Full Time Result (1X2)
-    "totals": 12580,     # Total Goals (Over/Under)
-    "spreads": 12218,    # Handicap / Asian Handicap
-}
-
-# Competiciones objetivo (termKey path)
-# Se descubren automáticamente del group.json, pero estas son las principales
-TARGET_COMPETITIONS = [
-    "england/premier_league",
-    "spain/la_liga",
-    "germany/bundesliga",
-    "italy/serie_a",
-    "france/ligue_1",
-    "champions_league",
-    "europa_league",
-    "usa/mls",
-]
-
-# Directorio de debug output
-DEBUG_DIR = Path("scraping_debug")
-
-# Kambi devuelve odds en milésimas (1950 = 1.95 decimal)
-ODDS_DIVISOR = 1000.0
-
 
 # ---------------------------------------------------------------------------
-# Scraper principal
+# 888sport — Plataforma Spectate
 # ---------------------------------------------------------------------------
 
-class KambiScraper:
-    """Scrapea odds de casas Kambi (888sport, Unibet) vía API REST pública."""
+class Sport888Scraper:
+    """
+    Scrapea 888sport via interceptación de su API Spectate.
 
-    def __init__(self, book_key: str = "888sport", timeout: int = 15):
-        if book_key not in BOOK_CONFIGS:
-            raise ValueError(
-                f"book_key '{book_key}' no válido. "
-                f"Opciones: {list(BOOK_CONFIGS.keys())}"
-            )
-        self.book_key = book_key
-        self.book_config = BOOK_CONFIGS[book_key]
-        self.operator = self.book_config["operator"]
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json",
-        })
+    API descubierta:
+        spectate-web.888sport.es/spectate/sportsbook-req/getUpcomingEvents/football/today
+        → keys: selection_pointers, events, event_order, match_request_limit
+    """
+
+    FOOTBALL_URL = "https://www.888sport.es/futbol/"
+    API_DOMAIN = "spectate-web.888sport.es"
+
+    def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
+        self.headless = headless
+        self.timeout_ms = timeout_ms
 
     def scrape_football_odds(self) -> tuple[dict, list[dict]]:
-        """
-        Scrapea odds de fútbol de la casa Kambi configurada.
+        from playwright.sync_api import sync_playwright, Response
 
-        Returns:
-            soft_odds: dict compatible con ev_calculator.py
-                {event_id: {market: {(outcome_name, point): odds}}}
-            events_info: lista con info de cada evento
-                [{"event_id", "home_team", "away_team", "league",
-                  "commence_time", "sport_key", "sport_title",
-                  "book_key", "book_name"}]
-        """
-        book_name = self.book_config["name"]
-        logger.info(f"Iniciando scraping de {book_name} fútbol (Kambi API)...")
+        api_responses: list[dict] = []
 
-        # 1. Descubrir competiciones disponibles
-        competitions = self._discover_competitions()
-        if not competitions:
-            logger.warning("No se encontraron competiciones. Usando lista fija.")
-            competitions = TARGET_COMPETITIONS
+        def on_response(response: Response):
+            url = response.url
+            if self.API_DOMAIN not in url:
+                return
+            if response.status != 200:
+                return
+            content_type = response.headers.get("content-type", "")
+            if "json" not in content_type and "javascript" not in content_type:
+                return
+            try:
+                body = response.json()
+                api_responses.append({"url": url, "data": body})
+                logger.info(f"  888sport API: {url[:80]}...")
+            except Exception:
+                pass
 
-        logger.info(f"  Competiciones a scrapear: {len(competitions)}")
+        logger.info("Iniciando scraping de 888sport (Spectate)...")
 
-        # 2. Para cada competición, obtener odds de cada mercado
-        all_events_raw: dict[str, dict] = {}  # event_id -> event_data
-        all_odds: dict[str, dict] = {}        # event_id -> {market -> outcomes}
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=self.headless,
+                args=["--ignore-certificate-errors"],
+            )
+            ctx = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="en-US",
+                ignore_https_errors=True,
+            )
+            page = ctx.new_page()
+            page.on("response", on_response)
 
-        for comp in competitions:
-            for market_key, category_id in MARKET_CATEGORIES.items():
-                try:
-                    data = self._fetch_competition_odds(comp, category_id)
-                    if not data or "events" not in data:
+            try:
+                logger.info(f"  Navegando a {self.FOOTBALL_URL}")
+                page.goto(self.FOOTBALL_URL, wait_until="networkidle",
+                         timeout=self.timeout_ms)
+                page.wait_for_timeout(5_000)
+            except Exception as e:
+                logger.warning(f"  Timeout en carga: {e}")
+
+            # Scroll para cargar más eventos
+            for _ in range(5):
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2_000)
+
+            # Intentar clics en ligas populares
+            try:
+                league_links = page.query_selector_all(
+                    'a[href*="premier"], a[href*="liga"], a[href*="bundesliga"], '
+                    'a[href*="serie-a"], a[href*="ligue"]'
+                )
+                for link in league_links[:5]:
+                    try:
+                        link.click()
+                        page.wait_for_timeout(3_000)
+                    except Exception:
                         continue
-                    self._parse_events(
-                        data["events"], market_key, all_events_raw, all_odds
-                    )
-                except Exception as e:
-                    logger.debug(f"  Error en {comp}/{market_key}: {e}")
-                    continue
+            except Exception:
+                pass
 
-            # Rate limiting cortés
-            time.sleep(0.3)
+            page.wait_for_timeout(3_000)
+            browser.close()
 
-        logger.info(
-            f"  Scraping completado: {len(all_events_raw)} eventos, "
-            f"{len(all_odds)} con odds"
-        )
+        logger.info(f"  888sport: {len(api_responses)} API responses capturadas")
 
-        # 3. Guardar debug
-        self._save_debug(all_events_raw, all_odds)
+        # Guardar debug
+        self._save_debug(api_responses)
 
-        # 4. Convertir a formato Paradigma
-        soft_odds, events_info = self._to_paradigma_format(
-            all_events_raw, all_odds
-        )
-
-        logger.info(f"  Datos formateados: {len(soft_odds)} eventos con odds")
+        # Parsear
+        soft_odds, events_info = self._parse_spectate(api_responses)
+        logger.info(f"  888sport: {len(soft_odds)} eventos con odds")
         return soft_odds, events_info
 
-    # ---------------------------------------------------------------------------
-    # API Kambi
-    # ---------------------------------------------------------------------------
-
-    def _discover_competitions(self) -> list[str]:
-        """Descubre competiciones de fútbol disponibles desde group.json."""
-        url = f"{KAMBI_BASE_URL}/{self.operator}/group.json"
-        params = {"lang": "en_US", "market": "ZZ"}
-
-        try:
-            resp = self.session.get(url, params=params, timeout=self.timeout)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            logger.warning(f"  No se pudo obtener group.json: {e}")
-            return []
-
-        competitions = []
-        try:
-            for sport_group in data.get("group", {}).get("groups", []):
-                if sport_group.get("termKey") != "football":
-                    continue
-
-                # Iterar países
-                for country in sport_group.get("groups", []):
-                    country_key = country.get("termKey", "")
-
-                    if "groups" in country:
-                        # País con sub-ligas
-                        for league in country["groups"]:
-                            league_key = league.get("termKey", "")
-                            comp_path = f"{country_key}/{league_key}"
-
-                            # Filtrar: solo incluir competiciones que nos interesan
-                            if self._is_target_competition(comp_path, league.get("name", "")):
-                                competitions.append(comp_path)
-                    else:
-                        # País sin sub-ligas (ej: competiciones internacionales)
-                        if self._is_target_competition(country_key, country.get("name", "")):
-                            competitions.append(country_key)
-        except Exception as e:
-            logger.warning(f"  Error parseando group.json: {e}")
-
-        logger.info(f"  Competiciones descubiertas: {len(competitions)}")
-        for comp in competitions:
-            logger.debug(f"    {comp}")
-
-        return competitions
-
-    @staticmethod
-    def _is_target_competition(comp_path: str, comp_name: str) -> bool:
-        """Verifica si una competición está en nuestra lista de interés."""
-        path_lower = comp_path.lower()
-        name_lower = comp_name.lower()
-
-        targets = [
-            "premier_league", "la_liga", "bundesliga", "serie_a",
-            "ligue_1", "champions_league", "europa_league", "mls",
-            "primera_division",  # Costa Rica
-            "eredivisie", "primeira_liga",  # Extra: Holanda, Portugal
-        ]
-
-        for target in targets:
-            if target in path_lower or target in name_lower:
-                return True
-        return False
-
-    def _fetch_competition_odds(
-        self, competition: str, category: int
-    ) -> Optional[dict]:
-        """Obtiene odds de una competición para un tipo de mercado."""
-        url = (
-            f"{KAMBI_BASE_URL}/{self.operator}"
-            f"/listView/football/{competition}.json"
-        )
-        params = {
-            "lang": "en_US",
-            "market": "ZZ",
-            "category": category,
-            "includeParticipants": "true",
-        }
-
-        try:
-            resp = self.session.get(url, params=params, timeout=self.timeout)
-            if resp.status_code == 404:
-                return None
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.HTTPError as e:
-            if "404" in str(e):
-                return None
-            logger.debug(f"  HTTP error para {competition}: {e}")
-            return None
-        except Exception as e:
-            logger.debug(f"  Error fetching {competition}: {e}")
-            return None
-
-    # ---------------------------------------------------------------------------
-    # Parsing
-    # ---------------------------------------------------------------------------
-
-    def _parse_events(
-        self,
-        events: list[dict],
-        market_key: str,
-        all_events_raw: dict,
-        all_odds: dict,
-    ):
-        """Parsea eventos de una respuesta Kambi y acumula odds."""
-        for event_wrapper in events:
-            event = event_wrapper.get("event", {})
-
-            # Filtrar eventos ya iniciados
-            state = event.get("state", "")
-            if state == "STARTED":
-                continue
-
-            event_id = str(event.get("id", ""))
-            if not event_id:
-                continue
-
-            home_name = event.get("homeName", "")
-            away_name = event.get("awayName", "")
-            if not home_name or not away_name:
-                continue
-
-            # Guardar info del evento
-            if event_id not in all_events_raw:
-                all_events_raw[event_id] = {
-                    "id": event_id,
-                    "home": home_name,
-                    "away": away_name,
-                    "league": event.get("group", ""),
-                    "start_time": event.get("start", ""),
-                    "sport": event.get("sport", "FOOTBALL"),
-                }
-
-            # Parsear betOffers
-            bet_offers = event_wrapper.get("betOffers", [])
-            if not bet_offers:
-                continue
-
-            if event_id not in all_odds:
-                all_odds[event_id] = {}
-
-            for offer in bet_offers:
-                outcomes = offer.get("outcomes", [])
-                if not outcomes:
-                    continue
-
-                parsed = self._parse_bet_offer(
-                    offer, outcomes, market_key, home_name, away_name
-                )
-                if parsed:
-                    if market_key not in all_odds[event_id]:
-                        all_odds[event_id][market_key] = {}
-                    all_odds[event_id][market_key].update(parsed)
-
-    def _parse_bet_offer(
-        self,
-        offer: dict,
-        outcomes: list[dict],
-        market_key: str,
-        home: str,
-        away: str,
-    ) -> Optional[dict]:
-        """Parsea un betOffer individual a nuestro formato."""
-        result = {}
-
-        for outcome in outcomes:
-            odds_milli = outcome.get("odds")
-            if odds_milli is None or odds_milli <= ODDS_DIVISOR:
-                continue
-
-            odds_decimal = odds_milli / ODDS_DIVISOR
-            label = outcome.get("label", "")
-            otype = outcome.get("type", "")
-
-            # Línea para totals/spreads (Kambi la da en milésimas)
-            line_milli = outcome.get("line")
-            line = line_milli / ODDS_DIVISOR if line_milli is not None else None
-
-            if market_key == "h2h":
-                # 1X2: mapear por tipo de outcome
-                if otype == "OT_ONE" or label == home:
-                    result[(home, None)] = odds_decimal
-                elif otype == "OT_CROSS" or label.lower() == "draw":
-                    result[("Draw", None)] = odds_decimal
-                elif otype == "OT_TWO" or label == away:
-                    result[(away, None)] = odds_decimal
-
-            elif market_key == "totals":
-                if line is None:
-                    continue
-                if otype == "OT_OVER" or "over" in label.lower():
-                    result[("Over", line)] = odds_decimal
-                elif otype == "OT_UNDER" or "under" in label.lower():
-                    result[("Under", line)] = odds_decimal
-
-            elif market_key == "spreads":
-                if line is None:
-                    continue
-                # Kambi: handicap line puede estar en offer o outcome
-                handicap_line = line
-                if otype == "OT_ONE" or label == home:
-                    result[(home, handicap_line)] = odds_decimal
-                elif otype == "OT_TWO" or label == away:
-                    # Away handicap es el opuesto
-                    result[(away, -handicap_line)] = odds_decimal
-
-        return result if result else None
-
-    # ---------------------------------------------------------------------------
-    # Formato Paradigma
-    # ---------------------------------------------------------------------------
-
-    def _to_paradigma_format(
-        self,
-        all_events_raw: dict,
-        all_odds: dict,
-    ) -> tuple[dict, list[dict]]:
-        """Convierte a formato compatible con ev_calculator.py."""
+    def _parse_spectate(self, responses: list[dict]) -> tuple[dict, list[dict]]:
+        """Parsea respuestas de la API Spectate de 888sport."""
         soft_odds = {}
         events_info = []
+        seen = set()
 
-        for event_id, event_data in all_events_raw.items():
-            if event_id not in all_odds:
-                continue
-            markets = all_odds[event_id]
-            if not markets:
-                continue
-
-            # Solo incluir mercados con datos
-            clean_markets = {k: v for k, v in markets.items() if v}
-            if not clean_markets:
+        for resp in responses:
+            data = resp["data"]
+            if not isinstance(data, dict):
                 continue
 
-            soft_odds[event_id] = clean_markets
-            events_info.append({
-                "event_id": event_id,
-                "home_team": event_data["home"],
-                "away_team": event_data["away"],
-                "league": event_data["league"],
-                "commence_time": event_data["start_time"],
-                "sport_key": "soccer",
-                "sport_title": f"Soccer - {event_data['league']}",
-                "book_key": self.book_key,
-                "book_name": self.book_config["name"],
-            })
+            events = data.get("events", {})
+            if not events:
+                # Buscar recursivamente
+                for key, val in data.items():
+                    if isinstance(val, dict) and "events" in val:
+                        events = val["events"]
+                        break
+
+            if not isinstance(events, dict):
+                if isinstance(events, list):
+                    for evt in events:
+                        self._parse_888_event(evt, soft_odds, events_info, seen)
+                continue
+
+            for evt_id, evt_data in events.items():
+                self._parse_888_event(evt_data, soft_odds, events_info, seen,
+                                     fallback_id=evt_id)
 
         return soft_odds, events_info
 
-    # ---------------------------------------------------------------------------
-    # Debug
-    # ---------------------------------------------------------------------------
+    def _parse_888_event(self, evt: dict, soft_odds: dict,
+                         events_info: list, seen: set,
+                         fallback_id: str = ""):
+        """Parsea un evento individual de la API Spectate."""
+        if not isinstance(evt, dict):
+            return
 
-    def _save_debug(self, all_events_raw: dict, all_odds: dict):
+        # Buscar nombres de equipo
+        home = (evt.get("home_name") or evt.get("homeName") or
+                evt.get("home") or evt.get("homeTeam") or "")
+        away = (evt.get("away_name") or evt.get("awayName") or
+                evt.get("away") or evt.get("awayTeam") or "")
+
+        # Intentar extraer de nombre combinado
+        if not home or not away:
+            name = evt.get("name", "") or evt.get("event_name", "")
+            for sep in [" v ", " vs ", " - ", " – "]:
+                if sep in name:
+                    parts = name.split(sep, 1)
+                    home, away = parts[0].strip(), parts[1].strip()
+                    break
+
+        if not home or not away:
+            return
+
+        event_id = str(evt.get("id") or evt.get("event_id") or
+                       evt.get("eventId") or fallback_id)
+        if not event_id or event_id in seen:
+            return
+        seen.add(event_id)
+
+        league = (evt.get("competition") or evt.get("league") or
+                  evt.get("competitionName") or "")
+        start_time = (evt.get("start_time") or evt.get("startTime") or
+                      evt.get("start") or "")
+
+        # Buscar odds en la estructura del evento
+        markets = self._extract_888_markets(evt, home, away)
+
+        if markets:
+            soft_odds[event_id] = markets
+
+        events_info.append({
+            "event_id": event_id,
+            "home_team": home,
+            "away_team": away,
+            "league": str(league),
+            "commence_time": str(start_time),
+            "sport_key": "soccer",
+            "sport_title": f"Soccer - {league}",
+            "book_key": "888sport",
+            "book_name": "888sport",
+        })
+
+    @staticmethod
+    def _extract_888_markets(evt: dict, home: str, away: str) -> dict:
+        """Extrae mercados/odds de un evento Spectate."""
+        markets = {}
+
+        # Buscar en sub-objetos que contengan odds/selections/markets
+        for key in ("selections", "markets", "odds", "betOffers",
+                    "match_markets", "prices"):
+            container = evt.get(key)
+            if not container:
+                continue
+
+            if isinstance(container, list):
+                for item in container:
+                    _parse_generic_selection(item, home, away, markets)
+            elif isinstance(container, dict):
+                for mk, mv in container.items():
+                    if isinstance(mv, list):
+                        for item in mv:
+                            _parse_generic_selection(item, home, away, markets)
+                    elif isinstance(mv, dict):
+                        _parse_generic_selection(mv, home, away, markets)
+
+        # Buscar odds directamente en el evento (flat)
+        h2h = {}
+        for hk in ("odds_home", "home_odds", "1"):
+            if hk in evt:
+                try:
+                    h2h[(home, None)] = float(evt[hk])
+                except (ValueError, TypeError):
+                    pass
+        for dk in ("odds_draw", "draw_odds", "X"):
+            if dk in evt:
+                try:
+                    h2h[("Draw", None)] = float(evt[dk])
+                except (ValueError, TypeError):
+                    pass
+        for ak in ("odds_away", "away_odds", "2"):
+            if ak in evt:
+                try:
+                    h2h[(away, None)] = float(evt[ak])
+                except (ValueError, TypeError):
+                    pass
+        if h2h:
+            markets.setdefault("h2h", {}).update(h2h)
+
+        return markets
+
+    def _save_debug(self, responses: list[dict]):
         DEBUG_DIR.mkdir(exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        book = self.book_key
-
-        # Guardar eventos
-        evt_path = DEBUG_DIR / f"kambi_{book}_events_{ts}.json"
-        evt_path.write_text(
-            json.dumps(all_events_raw, indent=2, default=str)
-        )
-
-        # Guardar odds (serializar tuple keys)
-        odds_serializable = {}
-        for eid, markets in all_odds.items():
-            odds_serializable[eid] = {}
-            for mkt, outcomes in markets.items():
-                odds_serializable[eid][mkt] = {
-                    f"{name}|{point}": odds
-                    for (name, point), odds in outcomes.items()
-                }
-
-        odds_path = DEBUG_DIR / f"kambi_{book}_odds_{ts}.json"
-        odds_path.write_text(
-            json.dumps(odds_serializable, indent=2, default=str)
-        )
-
-        logger.info(f"  Debug guardado: {evt_path}, {odds_path}")
+        path = DEBUG_DIR / f"888sport_spectate_{ts}.json"
+        serializable = []
+        for r in responses:
+            try:
+                json.dumps(r)
+                serializable.append(r)
+            except (TypeError, ValueError):
+                serializable.append({"url": r.get("url", ""), "error": "not serializable"})
+        path.write_text(json.dumps(serializable, indent=2, default=str))
+        logger.info(f"  Debug: {path}")
 
 
 # ---------------------------------------------------------------------------
-# CLI para prueba independiente
+# BetSafe — Betsson Group API
+# ---------------------------------------------------------------------------
+
+class BetSafeScraper:
+    """
+    Scrapea BetSafe via interceptación de su API Betsson.
+
+    API descubierta:
+        www.betsafe.com/api/sb/v1/widgets/event-market/v1
+        → data.events, data.markets, data.marketSelections, data.scoreboards
+    """
+
+    FOOTBALL_URL = "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming"
+    API_PATH_PREFIX = "/api/sb/v1/"
+
+    def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
+        self.headless = headless
+        self.timeout_ms = timeout_ms
+
+    def scrape_football_odds(self) -> tuple[dict, list[dict]]:
+        from playwright.sync_api import sync_playwright, Response
+
+        api_responses: list[dict] = []
+
+        def on_response(response: Response):
+            url = response.url
+            if self.API_PATH_PREFIX not in url:
+                return
+            if response.status != 200:
+                return
+            content_type = response.headers.get("content-type", "")
+            if "json" not in content_type:
+                return
+            try:
+                body = response.json()
+                size_kb = len(response.text()) / 1024
+                api_responses.append({"url": url, "data": body, "size_kb": size_kb})
+                logger.info(f"  BetSafe API: {url[:80]}... ({size_kb:.0f}KB)")
+            except Exception:
+                pass
+
+        logger.info("Iniciando scraping de BetSafe (Betsson API)...")
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=self.headless,
+                args=["--ignore-certificate-errors"],
+            )
+            ctx = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="en-US",
+                ignore_https_errors=True,
+            )
+            page = ctx.new_page()
+            page.on("response", on_response)
+
+            try:
+                logger.info(f"  Navegando a {self.FOOTBALL_URL}")
+                page.goto(self.FOOTBALL_URL, wait_until="networkidle",
+                         timeout=self.timeout_ms)
+                page.wait_for_timeout(5_000)
+            except Exception as e:
+                logger.warning(f"  Timeout en carga: {e}")
+
+            # Scroll para cargar más
+            for _ in range(8):
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2_000)
+
+            page.wait_for_timeout(3_000)
+            browser.close()
+
+        logger.info(f"  BetSafe: {len(api_responses)} API responses capturadas")
+
+        # Guardar debug
+        self._save_debug(api_responses)
+
+        # Parsear
+        soft_odds, events_info = self._parse_betsson(api_responses)
+        logger.info(f"  BetSafe: {len(soft_odds)} eventos con odds")
+        return soft_odds, events_info
+
+    def _parse_betsson(self, responses: list[dict]) -> tuple[dict, list[dict]]:
+        """Parsea respuestas de la API Betsson de BetSafe."""
+        soft_odds = {}
+        events_info = []
+        seen = set()
+
+        for resp in responses:
+            url = resp["url"]
+            data = resp["data"]
+
+            # El endpoint principal es event-market/v1
+            if "event-market" not in url and "view" not in url:
+                continue
+
+            if not isinstance(data, dict):
+                continue
+
+            inner = data.get("data", data)
+            if not isinstance(inner, dict):
+                continue
+
+            events_map = inner.get("events", {})
+            markets_map = inner.get("markets", {})
+            selections_map = inner.get("marketSelections", {})
+
+            if not events_map:
+                continue
+
+            # events_map puede ser dict o list
+            if isinstance(events_map, list):
+                for evt in events_map:
+                    self._parse_betsafe_event(
+                        evt, markets_map, selections_map,
+                        soft_odds, events_info, seen
+                    )
+            elif isinstance(events_map, dict):
+                for evt_id, evt in events_map.items():
+                    self._parse_betsafe_event(
+                        evt, markets_map, selections_map,
+                        soft_odds, events_info, seen,
+                        fallback_id=str(evt_id)
+                    )
+
+        return soft_odds, events_info
+
+    def _parse_betsafe_event(self, evt: dict, markets_map, selections_map,
+                              soft_odds: dict, events_info: list,
+                              seen: set, fallback_id: str = ""):
+        """Parsea un evento de BetSafe."""
+        if not isinstance(evt, dict):
+            return
+
+        # Nombres de equipo
+        home = (evt.get("homeName") or evt.get("home") or
+                evt.get("homeTeamName") or "")
+        away = (evt.get("awayName") or evt.get("away") or
+                evt.get("awayTeamName") or "")
+
+        # Intentar extraer de nombre combinado
+        if not home or not away:
+            name = evt.get("name", "") or evt.get("eventName", "")
+            for sep in [" v ", " vs ", " - ", " – ", " @ "]:
+                if sep in name:
+                    parts = name.split(sep, 1)
+                    home, away = parts[0].strip(), parts[1].strip()
+                    break
+
+        # Intentar desde participantes/competitors
+        if not home or not away:
+            participants = evt.get("participants") or evt.get("competitors") or []
+            if isinstance(participants, list) and len(participants) >= 2:
+                home = participants[0].get("name", "") if isinstance(participants[0], dict) else str(participants[0])
+                away = participants[1].get("name", "") if isinstance(participants[1], dict) else str(participants[1])
+
+        if not home or not away:
+            return
+
+        event_id = str(evt.get("id") or evt.get("eventId") or fallback_id)
+        if not event_id or event_id in seen:
+            return
+        seen.add(event_id)
+
+        league = (evt.get("competition") or evt.get("league") or
+                  evt.get("categoryName") or evt.get("groupName") or "")
+        start_time = (evt.get("startTime") or evt.get("start") or
+                      evt.get("startDate") or "")
+
+        # Buscar mercados asociados a este evento
+        markets = {}
+
+        # Método 1: market IDs en el evento
+        market_ids = evt.get("marketIds") or evt.get("markets") or []
+        if isinstance(market_ids, list):
+            for mid in market_ids:
+                mid_str = str(mid)
+                if isinstance(markets_map, dict) and mid_str in markets_map:
+                    mkt = markets_map[mid_str]
+                    self._parse_betsafe_market(
+                        mkt, mid_str, selections_map, home, away, markets
+                    )
+
+        # Método 2: buscar por event_id en markets_map
+        if not markets and isinstance(markets_map, dict):
+            for mid, mkt in markets_map.items():
+                if isinstance(mkt, dict):
+                    mkt_event_id = str(mkt.get("eventId") or mkt.get("event_id") or "")
+                    if mkt_event_id == event_id:
+                        self._parse_betsafe_market(
+                            mkt, str(mid), selections_map, home, away, markets
+                        )
+
+        # Método 3: odds directamente en el evento
+        if not markets:
+            markets = Sport888Scraper._extract_888_markets(evt, home, away)
+
+        if markets:
+            soft_odds[event_id] = markets
+
+        events_info.append({
+            "event_id": event_id,
+            "home_team": home,
+            "away_team": away,
+            "league": str(league),
+            "commence_time": str(start_time),
+            "sport_key": "soccer",
+            "sport_title": f"Soccer - {league}",
+            "book_key": "betsafe",
+            "book_name": "BetSafe",
+        })
+
+    @staticmethod
+    def _parse_betsafe_market(mkt: dict, mkt_id: str, selections_map,
+                               home: str, away: str, markets: dict):
+        """Parsea un mercado de BetSafe y extrae odds."""
+        if not isinstance(mkt, dict):
+            return
+
+        mkt_name = str(mkt.get("name") or mkt.get("marketName") or
+                       mkt.get("type") or mkt_id).lower()
+
+        # Obtener selections (odds) de este mercado
+        selection_ids = mkt.get("selectionIds") or mkt.get("selections") or []
+        selections = []
+
+        if isinstance(selection_ids, list) and isinstance(selections_map, dict):
+            for sid in selection_ids:
+                sid_str = str(sid)
+                if sid_str in selections_map:
+                    selections.append(selections_map[sid_str])
+        elif isinstance(selection_ids, list):
+            # selections_map podría estar inlined
+            selections = [s for s in selection_ids if isinstance(s, dict)]
+
+        # También buscar selections directamente en el mercado
+        if not selections:
+            for key in ("outcomes", "selections", "odds"):
+                val = mkt.get(key)
+                if isinstance(val, list):
+                    selections = val
+                    break
+
+        if not selections:
+            return
+
+        # Clasificar mercado
+        is_h2h = any(k in mkt_name for k in ["1x2", "match winner", "fulltime",
+                                               "full time", "match result",
+                                               "moneyline", "winner"])
+        is_total = any(k in mkt_name for k in ["over", "under", "total",
+                                                 "goals"])
+        is_spread = any(k in mkt_name for k in ["handicap", "spread", "asian",
+                                                  "hcap"])
+
+        for sel in selections:
+            if not isinstance(sel, dict):
+                continue
+
+            odds = sel.get("odds") or sel.get("price") or sel.get("decimal")
+            if odds is None:
+                continue
+            try:
+                odds = float(odds)
+                if odds > 100:
+                    odds = odds / 1000.0
+            except (ValueError, TypeError):
+                continue
+            if odds <= 1.0:
+                continue
+
+            label = str(sel.get("name") or sel.get("label") or
+                       sel.get("selectionName") or "")
+            line = sel.get("line") or sel.get("handicap") or sel.get("points")
+
+            if is_total and line is not None:
+                try:
+                    line = float(line)
+                    if line > 100:
+                        line = line / 1000.0
+                except (ValueError, TypeError):
+                    continue
+                if "totals" not in markets:
+                    markets["totals"] = {}
+                if "over" in label.lower():
+                    markets["totals"][("Over", line)] = odds
+                elif "under" in label.lower():
+                    markets["totals"][("Under", line)] = odds
+
+            elif is_spread and line is not None:
+                try:
+                    line = float(line)
+                    if abs(line) > 100:
+                        line = line / 1000.0
+                except (ValueError, TypeError):
+                    continue
+                if "spreads" not in markets:
+                    markets["spreads"] = {}
+                if label == home or "1" == label or "home" in label.lower():
+                    markets["spreads"][(home, line)] = odds
+                elif label == away or "2" == label or "away" in label.lower():
+                    markets["spreads"][(away, -line)] = odds
+
+            elif is_h2h or (not is_total and not is_spread):
+                if "h2h" not in markets:
+                    markets["h2h"] = {}
+                if label == home or "1" == label or "home" in label.lower():
+                    markets["h2h"][(home, None)] = odds
+                elif label.lower() in ("draw", "x", "empate"):
+                    markets["h2h"][("Draw", None)] = odds
+                elif label == away or "2" == label or "away" in label.lower():
+                    markets["h2h"][(away, None)] = odds
+
+    def _save_debug(self, responses: list[dict]):
+        DEBUG_DIR.mkdir(exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        path = DEBUG_DIR / f"betsafe_betsson_{ts}.json"
+        serializable = []
+        for r in responses:
+            try:
+                json.dumps(r)
+                serializable.append(r)
+            except (TypeError, ValueError):
+                serializable.append({"url": r.get("url", ""), "error": "not serializable"})
+        path.write_text(json.dumps(serializable, indent=2, default=str))
+        logger.info(f"  Debug: {path}")
+
+
+# ---------------------------------------------------------------------------
+# Helper compartido
+# ---------------------------------------------------------------------------
+
+def _parse_generic_selection(item: dict, home: str, away: str, markets: dict):
+    """Parsea una selección/outcome genérica e intenta clasificarla."""
+    if not isinstance(item, dict):
+        return
+
+    odds = item.get("odds") or item.get("price") or item.get("decimal")
+    if odds is None:
+        return
+    try:
+        odds = float(odds)
+        if odds > 100:
+            odds = odds / 1000.0
+    except (ValueError, TypeError):
+        return
+    if odds <= 1.0:
+        return
+
+    label = str(item.get("name") or item.get("label") or
+                item.get("selection_name") or "")
+    mkt_type = str(item.get("market_type") or item.get("type") or
+                   item.get("marketName") or "").lower()
+
+    line = item.get("line") or item.get("handicap") or item.get("points")
+
+    if "total" in mkt_type or "over" in mkt_type:
+        if line is not None:
+            try:
+                line = float(line)
+            except (ValueError, TypeError):
+                return
+            if "totals" not in markets:
+                markets["totals"] = {}
+            if "over" in label.lower():
+                markets["totals"][("Over", line)] = odds
+            elif "under" in label.lower():
+                markets["totals"][("Under", line)] = odds
+    elif "handicap" in mkt_type or "spread" in mkt_type:
+        if line is not None:
+            try:
+                line = float(line)
+            except (ValueError, TypeError):
+                return
+            if "spreads" not in markets:
+                markets["spreads"] = {}
+            if label == home or "home" in label.lower():
+                markets["spreads"][(home, line)] = odds
+            elif label == away or "away" in label.lower():
+                markets["spreads"][(away, -line)] = odds
+    else:
+        if "h2h" not in markets:
+            markets["h2h"] = {}
+        if label == home or label == "1" or "home" in label.lower():
+            markets["h2h"][(home, None)] = odds
+        elif label.lower() in ("draw", "x", "empate"):
+            markets["h2h"][("Draw", None)] = odds
+        elif label == away or label == "2" or "away" in label.lower():
+            markets["h2h"][(away, None)] = odds
+
+
+# ---------------------------------------------------------------------------
+# Factory para scanner_v2
+# ---------------------------------------------------------------------------
+
+def create_scraper(book_key: str, headless: bool = True):
+    """Crea el scraper correcto según book_key."""
+    if book_key == "888sport":
+        return Sport888Scraper(headless=headless)
+    elif book_key == "betsafe":
+        return BetSafeScraper(headless=headless)
+    else:
+        raise ValueError(f"book_key '{book_key}' no válido. Opciones: {list(BOOK_CONFIGS.keys())}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -460,31 +710,32 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    parser = argparse.ArgumentParser(description="Kambi scraper (888sport/Unibet)")
+    parser = argparse.ArgumentParser(description="888sport / BetSafe scraper")
     parser.add_argument(
         "--book", type=str, default="888sport",
         choices=list(BOOK_CONFIGS.keys()),
         help="Casa a scrapear",
     )
+    parser.add_argument("--no-headless", action="store_true",
+                       help="Mostrar browser")
     args = parser.parse_args()
 
-    scraper = KambiScraper(book_key=args.book)
+    scraper = create_scraper(args.book, headless=not args.no_headless)
     soft_odds, events_info = scraper.scrape_football_odds()
 
+    book_name = BOOK_CONFIGS[args.book]["name"]
     print(f"\n{'='*60}")
-    print(f"{BOOK_CONFIGS[args.book]['name']} (Kambi) — Eventos con odds: {len(soft_odds)}")
+    print(f"{book_name} — Eventos con odds: {len(soft_odds)}")
     print(f"{'='*60}")
 
     for info in events_info[:30]:
         eid = info["event_id"]
         if eid in soft_odds:
             markets = soft_odds[eid]
-            market_names = list(markets.keys())
             print(f"\n  {info['home_team']} vs {info['away_team']}")
             print(f"    Liga: {info['league']}")
-            print(f"    Mercados: {market_names}")
             for mkt_name, outcomes in markets.items():
                 print(f"    {mkt_name}:")
-                for (name, point), odds in outcomes.items():
+                for (name, point), odds_val in outcomes.items():
                     pt_str = f" {point}" if point is not None else ""
-                    print(f"      {name}{pt_str}: {odds:.4f}")
+                    print(f"      {name}{pt_str}: {odds_val:.4f}")
