@@ -32,7 +32,36 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 17:25 — Scraper DoradoBet (Altenar) + test MelBet
+### 🔴 2026-04-27 18:05 — Fix parser DoradoBet (relaciones por ID)
+
+**Qué cambió:**
+1. **doradobet_scraper.py** — Fix completo del parser. Ahora usa las relaciones correctas:
+   - `event.marketIds` → busca markets por `market.id`
+   - `market.oddIds` → busca odds por `odd.id`
+   - Nombre del evento viene como `"Home vs. Away"` (se splitea)
+   - Odds h2h: nombre del equipo o "1"/"X"/"2"
+
+**Comandos:**
+
+Probar DoradoBet sola:
+```bash
+cd paradigma
+python -m scraping.doradobet_scraper
+```
+
+Si funciona, probar las 3 juntas:
+```bash
+python -m scraping.scanner_v2 --books 1xbet,melbet,doradobet
+```
+
+**Qué buscar:**
+- ¿Ahora parsea los 20 eventos?
+- ¿Detecta h2h, totals, spreads?
+- Si falla, pegar el output completo
+
+---
+
+### ✅ 2026-04-27 17:25 — Scraper DoradoBet (Altenar) + test MelBet
 
 **Qué cambió:**
 1. **Nuevo: `scraping/doradobet_scraper.py`** — Scraper para DoradoBet usando la API de Altenar. Intercepta `GetUpcoming` y parsea eventos/odds.
