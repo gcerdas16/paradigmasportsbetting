@@ -1103,3 +1103,62 @@ events-table/v2 → UCL:
 3. Clasificar HOME/DRAW/AWAY por `selectionTemplateId` en vez de `label`
 
 **Archivo debug:** `scraping_debug/betsafe_betsson_20260428_045648.json`
+
+---
+
+### 2026-04-27 23:10 — BetSafe v4: events-table/v2 + HOME/DRAW/AWAY templates
+
+**Comando:** `cd paradigma && python -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~4 min
+**Exit code:** 0
+
+**Output:**
+```
+BetSafe — Eventos con odds: 2
+
+  Stockport vs Port Vale
+    Liga: Inglaterra League One
+    h2h:
+      Stockport: 1.3700
+
+  Libertad vs Independiente del Valle
+    Liga: Copa Libertadores
+    h2h:
+      Independiente del Valle: 2.6800
+```
+
+**Progreso vs v3:** El parser ahora incluye `events-table` en el URL filter y usa `inner["selections"]` correctamente. Pasó de 0 eventos → 2 eventos. Los eventos vienen del `liveAndUpcoming` inicial.
+
+**Bugs restantes (2):**
+
+**Bug 1 — Solo 1 selección por evento (falta DRAW y la otra selección):**
+- Stockport: solo captura HOME (1.37) — falta Draw y Port Vale (AWAY)
+- Independiente: captura una sola odd (2.68) — falta el resto
+- Causa probable: `sel.get("selectionTemplateId")` devuelve vacío → fallback a `label == home/away`
+  - El label del Draw en español es "Empate" — SÍ está en el check (`in ("draw", "x", "empate")`) ✅
+  - Pero quizás el label exacto es diferente ("Empate (X)", "X", etc.) → comparación falla
+  - O el campo real se llama algo distinto a `selectionTemplateId` en la respuesta real
+- **Acción requerida:** Revisar en el debug JSON cuál es el field name de HOME/DRAW/AWAY y cuál es el label exacto del Draw
+
+**Bug 2 — Solo 2 eventos (0 de UCL/EPL/La Liga/Bundesliga/Serie A/Ligue 1):**
+- Los eventos UCL confirmados en el debug de 22:55 (Atlético 2.95, PSG 2.48) NO aparecen
+- Los 2 eventos capturados (Stockport, Libertad) son de ligas que NO están en LEAGUE_URLS
+- Conclusión: `events-table/v2` SÍ se carga para el `liveAndUpcoming` inicial, pero las LEAGUE_URLS no están disparando events-table
+- Causa probable: Los slugs de las LEAGUE_URLS (`/champions-league`, `/premier-league`, etc.) son incorrectos — BetSafe puede usar slugs diferentes (ej. `/champions-league-1`, o con locale diferente)
+- **Acción requerida:** 
+  1. Confirmar manualmente las URLs exactas de cada liga en BetSafe
+  2. O navegar primero al `/futbol` general y hacer click en cada liga (en vez de navegar directo a la URL)
+
+**Diagnóstico resumen:**
+```
+events-table/v2 interceptado: SÍ (para liveAndUpcoming, no para ligas individuales)
+HOME/DRAW/AWAY parsing: PARCIAL (1 selección de 3 capturada)
+LEAGUE_URLS funcionando: NO (slugs incorrectos probablemente)
+```
+
+**Próximos pasos para dev PC:**
+1. Abrir el debug JSON de la corrida v4 y verificar:
+   - ¿Cuál es el field name de la selección template? (`selectionTemplateId`, `templateId`, `type`, etc.)
+   - ¿Cuál es el label exacto del Empate?
+2. Reemplazar navegación directa a LEAGUE_URLS por navegación programática (click en ligas desde el menú)
+3. O hardcodear `competitionIds` y llamar events-table/v2 directamente (requiere saber los IDs de cada liga)
