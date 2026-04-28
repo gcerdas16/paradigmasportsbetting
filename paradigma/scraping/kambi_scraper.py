@@ -416,37 +416,6 @@ class BetSafeScraper:
                     continue
 
             page.wait_for_timeout(2_000)
-
-            # ── Paso clave: fetch explícito de MW3W (1X2) ──
-            # BetSafe no carga odds 1X2 automáticamente — hay que pedirlas
-            mw3w_ids = self._collect_mw3w_market_ids(api_responses)
-            if mw3w_ids:
-                logger.info(f"  Fetching {len(mw3w_ids)} mercados MW3W explícitamente...")
-                # Hacer en batches de 20 para no sobrecargar
-                for i in range(0, len(mw3w_ids), 20):
-                    batch = mw3w_ids[i:i+20]
-                    ids_param = ",".join(batch)
-                    fetch_url = f"/api/sb/v1/widgets/event-market/v1?includescoreboards=true&marketids={ids_param}"
-                    try:
-                        result = page.evaluate(f"""
-                            fetch('{fetch_url}')
-                                .then(r => r.json())
-                                .catch(e => ({{ error: e.message }}))
-                        """)
-                        if isinstance(result, dict) and "error" not in result:
-                            api_responses.append({
-                                "url": f"https://www.betsafe.com{fetch_url}",
-                                "data": result,
-                                "size_kb": 0,
-                            })
-                            logger.info(f"  MW3W batch {i//20+1}: OK")
-                        else:
-                            logger.warning(f"  MW3W batch {i//20+1}: {result}")
-                    except Exception as e:
-                        logger.warning(f"  MW3W fetch error: {e}")
-            else:
-                logger.info("  No se encontraron market IDs MW3W para fetch")
-
             browser.close()
 
         logger.info(f"  BetSafe: {len(api_responses)} API responses capturadas")
@@ -459,55 +428,6 @@ class BetSafeScraper:
         logger.info(f"  BetSafe: {len(soft_odds)} eventos con odds")
         return soft_odds, events_info
 
-    @staticmethod
-    def _collect_mw3w_market_ids(responses: list[dict]) -> list[str]:
-        """
-        Busca en responses interceptadas los event IDs que tienen MW3W
-        y construye los market IDs para fetch explícito.
-        """
-        mw3w_ids = set()
-
-        for resp in responses:
-            data = resp.get("data", {})
-            if not isinstance(data, dict):
-                continue
-            inner = data.get("data", data)
-            if not isinstance(inner, dict):
-                continue
-
-            # Buscar en markets (lista) los que tengan marketTemplateId MW3W
-            markets = inner.get("markets", [])
-            if isinstance(markets, list):
-                for mkt in markets:
-                    if isinstance(mkt, dict):
-                        tmpl = str(mkt.get("marketTemplateId", "")).upper()
-                        if tmpl == "MW3W":
-                            mid = mkt.get("id", "")
-                            if mid:
-                                mw3w_ids.add(str(mid))
-
-            # Buscar en events que tengan marketTemplateIds incluyendo MW3W
-            events = inner.get("events", [])
-            if isinstance(events, list):
-                for evt in events:
-                    if not isinstance(evt, dict):
-                        continue
-                    templates = evt.get("marketTemplateIds", [])
-                    if isinstance(templates, list) and "MW3W" in templates:
-                        eid = evt.get("id", "")
-                        if eid:
-                            # Construir market ID: m-{eventId}-MW3W
-                            mw3w_ids.add(f"m-{eid}-MW3W")
-            elif isinstance(events, dict):
-                for eid, evt in events.items():
-                    if not isinstance(evt, dict):
-                        continue
-                    templates = evt.get("marketTemplateIds", [])
-                    if isinstance(templates, list) and "MW3W" in templates:
-                        mw3w_ids.add(f"m-{eid}-MW3W")
-
-        return list(mw3w_ids)
-
     def _parse_betsson(self, responses: list[dict]) -> tuple[dict, list[dict]]:
         """Parsea respuestas de la API Betsson de BetSafe."""
         soft_odds = {}
@@ -518,8 +438,8 @@ class BetSafeScraper:
             url = resp["url"]
             data = resp["data"]
 
-            # Endpoints relevantes: event-market, view, popular-bets
-            if not any(x in url for x in ["event-market", "view", "popular-bets"]):
+            # Endpoints relevantes
+            if not any(x in url for x in ["event-market", "events-table", "view", "popular-bets"]):
                 continue
 
             if not isinstance(data, dict):
@@ -531,7 +451,8 @@ class BetSafeScraper:
 
             events_map = inner.get("events", {})
             markets_map = inner.get("markets", {})
-            selections_map = inner.get("marketSelections", {})
+            # events-table/v2 usa "selections", event-market/v1 usa "marketSelections"
+            selections_map = inner.get("marketSelections") or inner.get("selections", {})
 
             if not events_map:
                 continue
@@ -696,11 +617,13 @@ class BetSafeScraper:
             if is_h2h:
                 if "h2h" not in markets:
                     markets["h2h"] = {}
-                if label == home:
+                # events-table/v2 usa selectionTemplateId: HOME/DRAW/AWAY
+                sel_tmpl = str(sel.get("selectionTemplateId", "")).upper()
+                if sel_tmpl == "HOME" or label == home:
                     markets["h2h"][(home, None)] = odds
-                elif label.lower() in ("draw", "x", "empate"):
+                elif sel_tmpl == "DRAW" or label.lower() in ("draw", "x", "empate"):
                     markets["h2h"][("Draw", None)] = odds
-                elif label == away:
+                elif sel_tmpl == "AWAY" or label == away:
                     markets["h2h"][(away, None)] = odds
 
             elif is_total and line is not None:
