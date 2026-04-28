@@ -773,3 +773,133 @@ Requiere nuevo scraper tipo Playwright para interceptar event-market/v1.
 **Archivos de debug:**
 - `scraping_debug/api_sniff/888sport_api_20260428_033853.json`
 - `scraping_debug/api_sniff/betsafe_api_20260428_033907.json`
+
+---
+
+### 2026-04-27 22:00 — Scrapers reescritos: 888sport (Spectate) + BetSafe (Betsson API)
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book 888sport --no-headless`
+**Duración:** ~2 min cada uno
+**Exit code:** 0 (pero 0 eventos en ambos)
+
+---
+
+#### 888sport — 0 eventos (bug en parser)
+
+```
+Scraper conecta correctamente a spectate-web.888sport.es ✅
+10 API responses capturadas (getUpcomingEvents, load/state, market_switcher, etc.)
+0 eventos con odds — parser falla silenciosamente
+```
+
+**Bug identificado — 2 problemas:**
+
+**Bug 1: `_parse_generic_selection` no reconoce `decimal_price`**
+La función busca: `item.get("odds") or item.get("price") or item.get("decimal")`
+Pero 888sport usa el campo `decimal_price` (string, ej: `"5.500"`).
+Resultado: `odds = None` → sale sin parsear.
+
+**Bug 2: `_extract_888_markets` no profundiza en `selections`**
+El código hace:
+```python
+for mk, mv in container.items():   # mv = market dict
+    _parse_generic_selection(mv, ...)   # WRONG: mv es el market, no la selección
+```
+Pero la estructura real es:
+```
+event["markets"]["1632241"]["selections"]["16720450232"]["decimal_price"] = "5.500"
+event["markets"]["1632241"]["selections"]["16720450232"]["type"] = "2"  (1/X/2)
+```
+Necesita iterar `mv["selections"].values()` y pasar cada selección a `_parse_generic_selection`.
+
+**Estructura real confirmada (debug JSON):**
+```json
+{
+  "name": "Abahani Dhaka vs PWD SC",
+  "id": 7541348,
+  "markets": {
+    "1632241": {
+      "name": "Ganador del partido",
+      "selections": {
+        "16720450232": {
+          "decimal_price": "5.500",
+          "type": "2",
+          "name": "PWD SC"
+        },
+        "16720450231": {
+          "decimal_price": "1.286",
+          "type": "1",
+          "name": "Abahani Dhaka"
+        }
+      }
+    }
+  }
+}
+```
+**Nota:** Solo 5 eventos capturados (ligas regionales: Bangladesh, Indonesia). La URL de fútbol muestra muy pocos partidos. Puede necesitar navegar a ligas específicas (Premier League, Champions League).
+
+**Archivo debug:** `scraping_debug/888sport_spectate_20260428_035332.json`
+
+---
+
+#### BetSafe — 0 eventos (bug en parser)
+
+```
+Scraper conecta correctamente a www.betsafe.com/api/sb/v1/ ✅
+44 API responses capturadas incluyendo 5x event-market/v1 ✅
+Eventos reales capturados: Paris SG - Bayern de Múnich, Atlético Madrid - Arsenal,
+  Libertad - Independiente del Valle, Southampton - Ipswich, etc.
+0 eventos con odds — parser falla en 2 puntos
+```
+
+**Bug 1: `participants[i].get("name")` → debe ser `participants[i].get("label")`**
+```python
+# Código actual (falla):
+home = participants[0].get("name", "")   # ← siempre ""
+# Estructura real:
+# participants[0] = {"label": "Paris SG", "id": "816", "side": 1, ...}
+# Fix:
+home = participants[0].get("label") or participants[0].get("name", "")
+```
+
+**Bug 2: `markets_map` y `selections_map` son listas, no dicts**
+El código hace `isinstance(markets_map, dict) and mid_str in markets_map` → siempre False.
+La estructura real:
+```
+inner["markets"]          → lista de dicts, cada uno con campo "id" y "eventId"
+inner["marketSelections"] → lista de dicts, cada uno con "marketId" y "odds" (float)
+```
+Para buscar mercados de un evento:
+```python
+# markets con eventId == evt["id"]
+evt_markets = [m for m in markets_map if m["eventId"] == evt_id]
+# selections de un market
+mkt_sels = [s for s in selections_map if s["marketId"] == mkt["id"]]
+# odds ya es float directo: s["odds"] = 2.0
+```
+
+**Bug 3: No hay mercado 1X2 en las respuestas capturadas**
+Los event-market/v1 capturados solo contienen mercados secundarios (AGSNAB, MWOU, BTTS, DC, etc.).
+El mercado 1X2 (Full Time Result) NO aparece en ninguna respuesta.
+Posible causa: la URL `/futbol?tab=liveAndUpcoming` muestra mercados populares/destacados, no el 1X2 básico.
+Solución: navegar a cada competición individualmente (ej: `/futbol/champions-league/`) para capturar el 1X2.
+
+**Estructura real confirmada:**
+```
+event["label"] = "Paris SG - Bayern de Múnich"
+event["participants"][0] = {"label": "Paris SG", "side": 1}
+event["participants"][1] = {"label": "Bayern de Múnich", "side": 2}
+event["id"] = "f-lGGIMROeykmUeY-bc5dXoA"
+event["competitionName"] = "UEFA Champions League"
+event["startDate"] = "2026-04-28T19:00:00Z"
+
+markets[0]["id"] = "m-f-lGGIMROeykmUeY-bc5dXoA-AGSNAB"
+markets[0]["eventId"] = "f-lGGIMROeykmUeY-bc5dXoA"
+markets[0]["marketTemplateId"] = "AGSNAB"
+
+marketSelections[0]["marketId"] = "m-f-lGGIMROeykmUeY-bc5dXoA-AGSNAB"
+marketSelections[0]["odds"] = 2.0   ← float directo
+marketSelections[0]["label"] = "Paris SG"
+```
+
+**Archivo debug:** `scraping_debug/betsafe_betsson_20260428_035613.json`
