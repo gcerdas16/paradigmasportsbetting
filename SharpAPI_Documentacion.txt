@@ -1,0 +1,2454 @@
+SharpAPI — Documentación Completa
+SharpAPI
+Documentación Completa de la API
+Referencia completa: endpoints, parámetros, ejemplos y guías
+Fuente: docs.sharpapi.io
+Perfecto.  Ahora  voy  a  compilar  toda  la  documentación  en  un  formato  organizado  y  completo.  Aquí  te  presento  la
+documentación completa de SharpAPI:
+Página 1
+SharpAPI — Documentación Completa
+DOCUMENTACIÓN COMPLETA DE SharpAPI
+INTRODUCCIÓN
+¿Qué es SharpAPI?
+SharpAPI es una plataforma de agregación de cuotas de apuestas deportivas en tiempo real que ofrece "actualizaciones de
+cuotas  sub-segundo  de  las  principales  casas  de  apuestas  a  través  de  REST  o  streaming  SSE",  junto  con  detección
+automatizada de valor esperado (EV) y alertas de arbitrage.
+Características Principales
+La plataforma proporciona:
+•  Cuotas en tiempo real con latencia sub-segundo
+•  Detección automatizada de valor esperado positivo utilizando referencias de casas de apuestas nítidas
+•  Identificación de arbitrage entre casas con cálculos de apuestas óptimos
+•  Streaming de Server-Sent Events para actualizaciones en vivo
+Estructura de Precios
+Nivel
+Costo
+Solicitudes/Min
+Características Clave
+Gratuito
+$0
+12
+Cuotas básicas y calendario
+Hobby
+$79
+120
+Añade detección de arbitrage
+Pro
+$229
+300
+Incluye EV y middles
+Sharp
+$399
+1,000
+Acceso
+ completo
+ más
+ soporte
+prioritario
+Enterprise
+Personalizado
+Personalizado
+Todas las características + custom
+El streaming WebSocket requiere un add-on de $99/mes
+Casas de Apuestas Soportadas
+SharpAPI cubre 32 casas de apuestas en múltiples categorías:
+•  Operadores principales de EE.UU. (DraftKings, FanDuel, BetMGM, Caesars, etc.)
+•  Casas nítidas (Pinnacle, Bookmaker, Circa)
+•  Plataformas internacionales (Bet365, Bovada, Betway, etc.)
+•  Intercambios (Betfair, ProphetX) y mercados de predicción (Polymarket, Kalshi)
+AUTENTICACIÓN
+Métodos de Autenticación
+SharpAPI ofrece tres formas de autenticar solicitudes API:
+1. Header X-API-Key (Recomendado)
+Página 2
+SharpAPI — Documentación Completa
+El método más seguro para aplicaciones del lado del servidor. Se implementa añadiendo:
+X-API-Key: sk_live_your_key
+2. Header Authorization Bearer
+Sigue el estándar OAuth con formato:
+Authorization: Bearer sk_live_your_key
+3. Parámetro de Consulta
+Útil para streaming SSE en navegadores donde los encabezados personalizados no son viables:
+?api_key=sk_live_your_key
+Obtención de Claves API
+Para acceder a las claves:
+1.  Crear cuenta en sharpapi.io
+2.  Ingresar al panel de control
+3.  Copiar la clave del dashboard principal
+Las claves comienzan con "sk" seguidas de "live" o "test_".
+Límites de Tasa por Suscripción
+Nivel
+Solicitudes/Min
+Características
+Gratuito
+12
+Cuotas, Eventos
+Hobby
+120
++ Arbitraje
+Pro
+300
++ EV, Middles
+Sharp
+1,000
++ Soporte Prioritario
+Mejores Prácticas
+•  Almacenar claves seguramente mediante variables de entorno
+•  Nunca exponerlas en código del lado del cliente
+•  Implementar lógica de reintentos para errores 429
+•  Monitorear uso mediante "/account/usage"
+•  Rotar claves regularmente con el endpoint "/account/keys/:keyId/rotate"
+GUÍA RÁPIDA DE INICIO
+Base Setup
+El API opera en "https://api.sharpapi.io/api/v1". Los usuarios deben registrarse en sharpapi.io para obtener una clave API que
+comienza con "sklive".
+Primera Solicitud Ejemplo
+Una llamada básica para recuperar datos de cuotas:
+Página 3
+SharpAPI — Documentación Completa
+curl -X GET "https://api.sharpapi.io/api/v1/odds?league=nba&sportsbook=draftkings&market=moneyline" \
+  -H "X-API-Key: YOUR_API_KEY"
+Estructura de Respuesta
+•  data: Array de oportunidades de apuestas con casa de apuestas, deporte, equipos, tipo de mercado, formatos de
+cuotas (Americano/Decimal) y probabilidad
+•   meta:  Metadatos  mostrando  cantidad  de  resultados,  registros  totales  disponibles,  casas  participantes,  detalles  de
+paginación y timestamp
+Parámetros de Consulta para Filtrado
+El API acepta parámetros para refinar resultados:
+•  Filtrar por liga (ej: NBA)
+•  Filtrar por casa de apuestas específica
+•  Recuperar solo eventos en vivo usando "live=true"
+•  Especificar tipos de mercado (moneyline, spread, total)
+Características de Apuestas de Valor
+Los  suscriptores  Pro  acceden  al  endpoint  de  oportunidades  para  apuestas  "+EV",  devolviendo  datos  incluyendo  IDs  de
+oportunidad, nombres de eventos, cálculos de cuotas nítidas, porcentajes de EV y valores del criterio Kelly para gestión de
+banca.
+Actualizaciones en Tiempo Real
+El  streaming  de  Server-Sent  Events  (SSE)  proporciona  notificaciones  instantáneas  para  cambios  de  cuotas,  nuevas
+detecciones de EV y oportunidades de arbitrage a través de oyentes de eventos.
+REFERENCIA DE API
+Información Base
+La
+ documentación
+ de
+ SharpAPI
+ proporciona
+ una
+ referencia
+ completa
+ para
+ su
+ API
+ REST
+ ubicada
+ en
+"https://api.sharpapi.io/api/v1". La plataforma entrega datos de cuotas de apuestas deportivas y oportunidades en múltiples
+casas de apuestas.
+Requisitos Principales de Solicitud
+•  Todas las solicitudes utilizan HTTPS
+•  Opciones de autenticación: header "X-API-Key", header "Authorization: Bearer" o parámetro de consulta "api_key"
+•  Los cuerpos de solicitud usan JSON con "Content-Type: application/json"
+•  Los nombres de campos siguen la convención "snake_case"
+Categorías de Endpoints (35 rutas en 7 espacios de nombres)
+Endpoints de Cuotas
+•  GET "/api/v1/odds" — Snapshot de cuotas actual
+•  GET "/api/v1/odds/delta" — Cambios de cuotas a lo largo del tiempo
+Página 4
+SharpAPI — Documentación Completa
+•  GET "/api/v1/odds/best" — Mejores cuotas disponibles
+•  GET "/api/v1/odds/comparison" — Comparación entre casas de apuestas
+•  POST "/api/v1/odds/batch" — Consultas de cuotas por lotes
+Endpoints de Eventos
+•  GET "/api/v1/events" — Listar eventos próximos/en vivo
+•  GET "/api/v1/events/:eventId" — Detalles de evento específico
+•  GET "/api/v1/events/:eventId/odds" — Cuotas específicas del evento
+•  GET "/api/v1/events/:eventId/markets" — Mercados disponibles
+Oportunidades (requiere autenticación)
+•  GET "/api/v1/opportunities/ev" — Oportunidades de valor esperado
+•  GET "/api/v1/opportunities/arbitrage" — Oportunidades de arbitrage
+•  GET "/api/v1/opportunities/middles" — Oportunidades de middles
+Splits de Apuestas
+•  GET "/api/v1/splits" — Splits de acción de apuestas actuales
+•  GET "/api/v1/splits/history" — Datos históricos de splits
+Streaming
+•  GET "/api/v1/stream" — Stream de Server-Sent Events
+Gestión de Cuenta
+•  GET "/api/v1/account" — Información de cuenta
+•  GET "/api/v1/account/usage" — Estadísticas de uso de API
+•  GET/POST/DELETE "/api/v1/account/keys" — Gestión de claves API
+•  POST "/api/v1/account/keys/:keyId/rotate" — Rotación de claves
+Datos de Referencia (Acceso Público)
+•  GET "/api/v1/sports" — Deportes disponibles
+•  GET "/api/v1/leagues" — Listados de ligas
+•  GET "/api/v1/sportsbooks" — Directorio de casas de apuestas
+•  GET "/api/v1/markets" — Tipos de mercado
+•  GET "/api/v1/teams" — Información de equipos
+Endpoints Empresariales
+•  GET "/api/v1/futures" — Cuotas de futuros
+•  GET "/api/v1/futures/odds" — Precios de futuros detallados
+CONVENCIONES DE RESPUESTA
+Estructura de Respuesta
+Los códigos de estado HTTP determinan éxito/fallo, no los campos de respuesta. Los códigos de estado varían de "200"
+(éxito con cuerpo) a "5xx" (errores del servidor), con "204" para eliminación y "302" para redirecciones.
+Las respuestas exitosas utilizan dos formatos:
+1.  No paginada: "{ "data": {...}, "updated_at": "..." }"
+2.  Paginada: Añade un bloque de paginación con "limit", "offset", "count", "total", "hasmore" y "nextoffset"
+Página 5
+SharpAPI — Documentación Completa
+Estándares de Campos
+Todos los campos de servidor a cliente utilizan snakecase (ej: "eventid", "market_type"). Los timestamps siguen el formato
+RFC 3339/ISO 8601 UTC como "2026-04-16T19:29:38.920698424Z".
+Los campos de timestamp comunes incluyen "updatedat" (tiempo de emisión de respuesta) y "fetchedat" (tiempo de encuesta
+ascendente).
+Manejo de Errores
+Las respuestas de error contienen: "code" (identificador estable), "message" (legible para humanos), link "docs" opcional y
+"retryAfter" en límites de tasa.
+Los códigos de error comunes incluyen "validationerror", "ratelimited", "tierrestricted" y "notfound".
+Características de Rendimiento
+•  Encabezados de límite de tasa rastrean "X-RateLimit-Limit", "X-RateLimit-Remaining" y timestamps de reinicio
+•   Soporte  de  ETag  habilita  solicitudes  condicionales  a  través  de  "If-None-Match"  para  ahorrar  ancho  de  banda  en
+cargas útiles grandes
+•  IDs canónicos permiten unir entre endpoints (ej: formato de "eventid": "{league}{home}{away}{date}")
+SharpAPI  publica  especificaciones  legibles  por  máquina:  OpenAPI  3.1  para  superficies  REST  y  AsyncAPI  3.0  para
+WebSocket.
+Formato de Respuesta de Éxito
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "has_more": true,
+    "next_offset": 50,
+    "next_cursor": "..."
+  },
+  "meta": {
+    "count": 1,
+    "total": 3095,
+    "updated_at": "ISO 8601 timestamp",
+    "filters": {...}
+  }
+}
+Formato de Respuesta de Error
+{
+  "error": {
+    "code": "error_code_string",
+    "message": "Human-readable description",
+    "docs": "URL to documentation"
+  }
+}
+Página 6
+SharpAPI — Documentación Completa
+Parámetros de Filtrado y Consulta
+Parámetro
+Tipo
+Ejemplo
+Propósito
+"sportsbook"
+string
+"draftkings,fanduel"
+Filtrar
+ por
+ casas
+ de
+ apuestas
+(separadas por comas)
+"sport"
+string
+"basketball,football"
+Filtrar por deporte
+"league"
+string
+"nba,nfl"
+Filtrar por liga
+"market"
+string
+"moneyline,spread"
+Filtrar por tipo de mercado
+"event"
+string
+"evt_abc123"
+Filtrar por ID de evento
+"live"
+boolean
+"true"
+Solo eventos en vivo
+"sort"
+string
+"-odds_american"
+Ordenar  campo  (prefijo  "-"  para
+descendente)
+"fields"
+string
+"id,sportsbook,odds_american"
+Seleccionar campos específicos
+"min_odds"
+number
+"-110"
+Umbral de cuotas mínimo
+"max_odds"
+number
+"200"
+Umbral de cuotas máximo
+"limit"
+number
+"25"
+Elementos  por  página  (defecto:  50,
+máx: 200)
+"offset"
+number
+"50"
+Desplazamiento de paginación
+"cursor"
+string
+—
+Paginación
+ basada
+ en
+ cursor
+(recomendada)
+Formatos de Cuotas
+Todas las cuotas se devuelven con tres representaciones:
+•  "odds_american": Formato estándar de EE.UU. (ej: -110, +150)
+•  "odds_decimal": Formato multiplicador (ej: 1.909, 2.50)
+•  "odds_probability": Probabilidad implícita como decimal (0 a 1)
+Comparación de Niveles
+Característica
+Gratuito
+Hobby
+Pro
+Sharp
+Enterprise
+Casas de apuestas
+2
+5
+15
+32
+32
+Retraso de datos
+60s
+0s
+0s
+0s
+0s
+Solicitudes/min
+12
+120
+300
+1,000
+Personalizado
+Acceso Pinnacle
+No
+No
+Sí
+Sí
+Sí
+EV/Arbitrage/Middles
+No
+No
+Sí
+Sí
+Sí
+Streaming
+No
+Add-on
+Add-on
+Add-on
+Incluido
+Batch Event Max
+10
+10
+50
+50
+100
+Encabezados de Límite de Tasa
+Cada respuesta incluye:
+•  "X-RateLimit-Limit" — Máximo de solicitudes por minuto
+•  "X-RateLimit-Remaining" — Solicitudes restantes en la ventana
+•  "X-RateLimit-Reset" — Timestamp Unix de reinicio
+•  "X-Data-Delay" — Latencia de datos en segundos
+•  "X-Request-Id" — Identificador único de solicitud
+Códigos de Error Clave
+Código
+Estado HTTP
+Descripción
+Página 7
+SharpAPI — Documentación Completa
+"missingapikey"
+401
+Sin autenticación proporcionada
+"invalidapikey"
+401
+Clave API no reconocida
+"tier_restricted"
+403
+Característica no disponible en nivel actual
+"rate_limited"
+429
+Límite de solicitud excedido
+"validation_error"
+400
+Parámetros o cuerpo inválido
+"unknown_endpoint"
+410
+Ruta de API incorrecta
+"not_found"
+404
+Recurso no existe
+Notas Importantes
+•  Usar paginación basada en cursor ("cursor" parámetro) para exploraciones de múltiples páginas sobre datos en vivo
+para evitar desvío de desplazamiento
+•  Los nombres de parámetro son siempre singulares: usar "sportsbook=" no "sportsbooks="
+•  La especificación OpenAPI 3.1 está disponible para importar en herramientas como Postman
+•  Todos los timestamps están en formato ISO 8601
+•  Streaming WebSocket y SSE disponible con suscripción de add-on apropiada
+DATOS DE REFERENCIA
+ENDPOINT DE DEPORTES
+Solicitud: "GET /api/v1/sports"
+Autenticación: Requerida (clave API en header "X-API-Key")
+Disponibilidad: Todos los niveles, incluyendo nivel Gratuito
+Descripción General
+El endpoint de Deportes proporciona acceso a todos los deportes disponibles con sus ligas asociadas y conteos de eventos.
+Información Clave
+El endpoint devuelve una lista de deportes con estos puntos de datos:
+•  Identificador del deporte y nombre para mostrar
+•  Ligas asociadas dentro de cada deporte
+•  Conteo de evento actual y conteo de evento en vivo
+Deportes Disponibles
+El API soporta 19 deportes incluyendo:
+•  Basketball (NBA, NCAAB, WNBA)
+•  Football (NFL, NCAAF)
+•  Hockey (NHL)
+•  Baseball (MLB)
+•  Soccer (EPL, La Liga, Serie A, Bundesliga, MLS)
+•  Tennis (ATP, WTA)
+•  MMA (UFC)
+Página 8
+SharpAPI — Documentación Completa
+•  Golf (PGA)
+•  Deportes adicionales: Boxing, Cricket, Rugby, Lacrosse, Motorsports, Curling, Darts, Snooker, Table Tennis y Esports
+Estructura de Respuesta
+Cada objeto de deporte incluye:
+•  "id": identificador en minúsculas para usar en filtros de API
+•  "name": nombre del deporte legible para humanos
+•  "leagues": array de IDs de liga
+•  "event_count": total de eventos disponibles con cuotas
+•  "live_count": eventos activos/en vivo actualmente
+Uso en Filtros
+Usar el ID del deporte para filtrar otros endpoints: "?sport=basketball" o "?sport=basketball,football" para múltiples deportes.
+Nota: Los conteos de evento son dinámicos y reflejan calendarios actuales; los deportes fuera de temporada muestran cero
+eventos.
+ENDPOINT DE LIGAS
+Ruta: "GET /api/v1/leagues"
+Autenticación: Requiere autenticación por clave API en todos los niveles de suscripción
+Descripción General
+El endpoint de Ligas proporciona acceso a todas las ligas deportivas disponibles en el sistema SharpAPI. Es accesible a
+través de "GET /api/v1/leagues" y requiere autenticación con clave API en todos los niveles de suscripción.
+Parámetros Clave
+El endpoint acepta un parámetro de consulta opcional:
+•  "sport" (string): Filtra resultados por tipo de deporte (ej: basketball, football). Por defecto devuelve todas las ligas.
+Estructura de Respuesta
+Las respuestas incluyen un array "data" conteniendo objetos de liga y metadatos. Cada objeto de liga contiene:
+•  "id": Identificador único para filtrado en otros endpoints
+•  "name": Designación de liga legible para humanos
+•  "sport": Clasificación del deporte padre
+•  "event_count": Número de eventos actualmente disponibles con cuotas
+•  "live_count": Eventos actualmente en juego
+Ligas Soportadas
+El sistema cubre 16 ligas principales en 8 deportes:
+Basketball: NBA, NCAAB, WNBA
+Football: NFL, NCAAF
+Hockey: NHL
+Baseball: MLB
+Soccer: EPL, La Liga, Serie A, Bundesliga, MLS
+Página 9
+SharpAPI — Documentación Completa
+Tennis: ATP, WTA
+MMA: UFC
+Golf: PGA Tour
+Notas de Uso
+Los identificadores de liga sirven como parámetros de filtro en endpoints relacionados como cuotas y eventos. Los conteos de
+evento son dinámicos y reflejan disponibilidad estacional—las ligas fuera de temporada muestran cero eventos.
+ENDPOINT DE CASAS DE APUESTAS
+Ruta: "GET /api/v1/sportsbooks"
+Autenticación: Requiere clave API (header X-API-Key)
+Disponibilidad: Todos los niveles de suscripción, incluyendo Gratuito
+Descripción General
+El endpoint de Casas de Apuestas proporciona acceso a una lista de casas de apuestas disponibles y su estado operacional
+a través de la plataforma SharpAPI.
+Funcionalidad Principal
+Este endpoint recupera metadatos de la casa de apuestas incluyendo estado operacional, disponibilidad de características y
+requisitos de nivel. La respuesta indica "qué nivel se requiere para acceder a los datos de cada libro".
+Esquema de Respuesta
+Cada objeto de casa de apuestas contiene:
+Campo
+Tipo
+Propósito
+"id"
+string
+Identificador único para consultas de API
+"display_name"
+string
+Nombre legible para humanos
+"hasliveodds"
+boolean
+Soporte de cuotas en juego
+"hasplayerprops"
+boolean
+Disponibilidad de mercado de prop de jugador
+"regions"
+array
+Disponibilidad  geográfica  (US,  UK,  EU,  AU,
+GLOBAL)
+"is_sharp"
+boolean
+Indica clasificación de mercado eficiente/nítido
+"status"
+string
+"active" o "inactive"
+"event_count"
+integer
+Eventos disponibles actuales
+"last_update"
+ISO 8601
+Timestamp  de  actualización  de  datos  más
+reciente
+"requires_tier"
+string/null
+Nivel de suscripción mínimo requerido
+Estructura de Acceso por Nivel
+Gratuito/Hobby/Pro: Acceso a 23 casas de apuestas
+Sharp/Enterprise: Acceso a todas las 26 casas de apuestas (incluye Pinnacle, Circa Sports, Bookmaker, ProphetX, Betfair)
+Acceder a libros restringidos sin autorización de nivel apropiada devuelve un error "403 tier_restricted".
+Categorías de Casa de Apuestas
+Página 10
+SharpAPI — Documentación Completa
+Libros Principales de EE.UU.: DraftKings, FanDuel, BetMGM, Caesars (nivel Gratuito)
+Libros Nítidos: Pinnacle, Circa Sports (solo nivel Sharp)
+Internacional: Bet365, Betway, Sky Bet
+Intercambios y Mercados de Predicción: Betfair, Polymarket, Kalshi
+ENDPOINT DE MERCADOS
+Acceso: "GET /api/v1/markets"
+Autenticación: Requerida en todos los niveles de precios
+Descripción General
+El endpoint de Mercados ("GET /api/v1/markets") proporciona información sobre tipos de mercado de apuestas disponibles,
+sus configuraciones y disponibilidad de deporte.
+Parámetros de Consulta
+•  sport (string, opcional): Filtrar resultados por identificador de deporte (ej: "basketball"). Por defecto devuelve todos los
+mercados.
+Estructura de Respuesta
+La respuesta exitosa (HTTP 200) incluye:
+•  array de data: Contiene objetos de mercado con información detallada
+•  objeto meta: Incluye estadísticas de conteo y detalles de límite de tasa
+Campos de Objeto de Mercado
+Cada mercado contiene:
+•  "id": Identificador único para filtrado en otros endpoints
+•  "name": Título de mercado amigable para mostrar
+•  "description": Breve explicación del tipo de mercado
+•  "hasLine": Booleano indicando si existe un valor de línea numérica
+•  "examples": Descripciones de selección de muestra
+•  "event_count": Número actual de eventos que ofrecen este mercado
+•  "selection_count": Total de selecciones únicas disponibles
+•  "sports": Array de IDs de deporte soportados
+Categorías Principales de Mercado
+Mercados Principales (más ampliamente disponibles):
+•  Moneyline (predicción de ganador)
+•  Point Spread (apuestas de handicap con valores de línea)
+•  Total Points (sobre/bajo de puntos combinados)
+•  Team Total (predicciones de puntuación de equipo individual)
+Mercados de Proposición:
+•  Player Props (estadísticas de rendimiento individual con líneas)
+•  Game Props (ocurrencias de juego específico)
+Página 11
+SharpAPI — Documentación Completa
+Mercados Especializados:
+•  Period Markets (1er tiempo, 1er cuarto, etc.)
+•  Futures (resultados de temporada completa o campeonato)
+Uso de Implementación
+Los IDs de mercado funcionan como parámetros de filtro en todo el API. Por ejemplo, filtrado de solicitudes de cuotas por
+"market=moneyline" o combinando múltiples mercados con "market=pointspread,totalpoints".
+Variaciones de Cobertura de Deporte
+La disponibilidad de mercado difiere por deporte. Las ligas profesionales (NBA, NFL, MLB, NHL) soportan tipos de mercado
+comprensivos, mientras que deportes especiales como MMA y golf ofrecen mercados limitados. La designación "Limitada"
+indica que ciertas casas de apuestas proporcionan mercados para eventos específicos solamente.
+ENDPOINTS DE CUOTAS
+ENDPOINT DE SNAPSHOT DE CUOTAS
+Ruta: "GET /api/v1/odds"
+Descripción General
+El endpoint de Snapshot de Cuotas recupera cuotas de apuestas actuales de múltiples casas de apuestas. Está disponible
+para todos los niveles de suscripción, aunque el acceso a libros específicos depende de tu plan.
+Autenticación y Acceso
+El endpoint requiere una clave API y está ubicado en "GET /api/v1/odds". Los usuarios de nivel Gratuito pueden acceder solo
+a  DraftKings  y  FanDuel,  mientras  que  los  suscriptores  de  nivel  Sharp  obtienen  acceso  a  las  32  casas  de  apuestas
+disponibles, incluyendo Pinnacle.
+Parámetros de Consulta Clave
+Opciones de Filtrado:
+•  "sportsbook": IDs de libros separados por comas (limitado por nivel)
+•  "sport"/"league": Filtrar por deporte o liga
+•  "market": Filtrar tipos de mercado usando alias como "main", "spread", "total", "props" o tipos exactos
+•  "event": IDs de evento específico
+•  "live": Booleano para filtrar cuotas en vivo vs prematch
+Paginación y Resultados:
+•  "limit": Máximo 200 resultados por página (defecto 50)
+•  "cursor": Recomendado para exploraciones de múltiples páginas (estable contra actualizaciones en vivo)
+•  "offset": Paginación heredada (máx 500)
+Ordenamiento y Selección:
+•  "sort": Ordenar por cualquier campo (prefijo con "-" para descendente)
+•  "fields": Devolver solo campos específicos
+•  "minodds"/"maxodds": Filtrar por rango de cuotas americanas
+Página 12
+SharpAPI — Documentación Completa
+•  "group_by=event": Agrupar resultados por evento en lugar de lista plana
+Estructura de Respuesta
+Las respuestas exitosas incluyen:
+•  "data": Array de objetos de cuotas
+•  "meta": Metadatos con conteos, libros disponibles e información de paginación
+•  Encabezados de límite de tasa: "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"
+Campos de Objeto de Cuotas
+Cada entrada de cuotas contiene: "id", "sportsbook", "eventid", "sport", "league", nombres de equipo, "markettype", "selection",
+cuotas en formatos Americano/Decimal/Probabilidad, valor "line", timestamps e indicador de estado "is_live".
+Mejor Práctica de Paginación
+"Usar paginación basada en cursor para exploraciones de múltiples páginas" ya que los datos en vivo se actualizan cada ~15
+segundos, causando posible desvío de fila con paginación basada en desplazamiento. Los cursores son opacos y válidos solo
+para parámetros de filtro coincidentes.
+Ejemplos de Código
+cURL (básico):
+curl -X GET "https://api.sharpapi.io/api/v1/odds?league=nba&sportsbook=draftkings&market=moneyline" \
+  -H "X-API-Key: YOUR_API_KEY"
+Python (paginación con cursor):
+import requests
+def fetch_all_odds():
+    results = []
+    params = {'league': 'nba', 'sportsbook': 'draftkings', 'market': 'moneyline', 'limit': 200}
+    cursor = None
+    
+    while True:
+        if cursor:
+            params['cursor'] = cursor
+        resp = requests.get(
+            'https://api.sharpapi.io/api/v1/odds',
+            params=params,
+            headers={'X-API-Key': 'YOUR_API_KEY'}
+        ).json()
+        
+        results.extend(resp['data'])
+        pagination = resp['pagination']
+        if not pagination['has_more']:
+            break
+        cursor = pagination['next_cursor']
+    
+    return results
+Endpoints Relacionados
+•  Odds Delta (cuotas cambiadas desde timestamp)
+Página 13
+SharpAPI — Documentación Completa
+•  Best Odds (mejores líneas entre libros)
+•  Odds Comparison (comparación lado a lado de libros)
+•  Batch Odds (múltiples eventos en una solicitud)
+ENDPOINT DE DELTA DE CUOTAS
+Endpoint: "GET /api/v1/odds/delta"
+Autenticación: Requerida (todos los niveles)
+Descripción General
+El endpoint de Odds Delta recupera solo cuotas que han cambiado desde un timestamp especificado, haciéndolo ideal para
+clientes de polling que necesitan actualizaciones incrementales sin buscar snapshots completos.
+Parámetros Clave
+Parámetro
+Tipo
+Defecto
+Propósito
+"since"
+string
+requerido
+Timestamp  ISO  8601;  devuelve
+cuotas  actualizadas  después  de
+esta hora
+"sportsbook"
+string
+all
+IDs de casa de apuestas separados
+por comas
+"sport"
+string
+all
+Filtrar por deporte (ej: basketball)
+"league"
+string
+all
+Filtrar por liga (ej: nba)
+"market"
+string
+all
+Filtrar
+ por
+ tipo
+ de
+ mercado
+(moneyline, spread, total)
+"event"
+string
+—
+Filtrar por ID de evento específico
+"live"
+boolean
+false
+Devolver solo eventos en juego
+"limit"
+integer
+50
+Máximo  de  resultados  por  página
+(máx 500)
+"offset"
+integer
+0
+Desplazamiento
+ de
+ paginación
+(≤500)
+Restricciones Críticas
+La documentación enfatiza que "el parámetro "since" es requerido." Omitirlo dispara un "400 validation_error". Además, el
+sistema mantiene solo una ventana de retención de 10 minutos para registros de eliminación, significando que solicitudes más
+antiguas pueden recibir resultados limitados.
+Estructura de Respuesta
+Las respuestas exitosas (200) incluyen:
+•  array de data: Objetos de cuotas que coinciden con el formato del endpoint "/odds"
+•  objeto meta: Contiene "servertime" (para encadenar solicitudes), "bookschanged" (casas de apuestas afectadas) y
+detalles de paginación
+Estrategia de Polling Recomendada
+La  documentación  aconseja  usar  "meta.server_time"  de  cada  respuesta  como  el  valor  "since"  subsecuente  para  asegurar
+ventanas sin solapamiento y prevenir duplicados. Los intervalos de polling típicos son 5-30 segundos.
+ENDPOINT DE MEJORES CUOTAS
+Endpoint: "GET /api/v1/odds/best"
+Página 14
+SharpAPI — Documentación Completa
+Descripción General
+El  endpoint  de  Mejores  Cuotas  ("GET  /api/v1/odds/best")  compara  cuotas  en  todas  las  casas  de  apuestas  disponibles  y
+devuelve la línea más favorable para cada selección.
+Características Clave
+•  Disponibilidad: Todos los niveles (nivel Gratuito incluye DraftKings y FanDuel; Pro+ añade Pinnacle)
+•  Filtrado automático: Excluye cuotas obsoletas (>5 minutos prematch, >1 minuto en vivo)
+•  Datos de comparación: Muestra cuotas por libro y cálculos de ventaja
+Parámetros de Consulta
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar por deporte(s)
+"league"
+string
+all
+Filtrar por liga(s)
+"market"
+string
+all
+Filtrar por tipo de mercado
+"event"
+string
+—
+Filtrar por ID(s) de evento
+"live"
+boolean
+—
+Solo en vivo o prematch
+"minodds"/"maxodds"
+number
+—
+Filtro de rango de cuotas
+"limit"
+integer
+50
+Resultados por página (máx 200)
+"offset"
+integer
+0
+Desplazamiento de paginación
+Estructura de Respuesta
+Cada resultado incluye:
+•  Detalles de evento y mercado
+•  best_odds: Americano, decimal y probabilidad implícita
+•  best_book: Casa de apuestas con cuotas óptimas
+•  all_books: Comparación completa con porcentajes de ventaja y timestamps
+Ejemplo de Uso
+curl -X GET "https://api.sharpapi.io/api/v1/odds/best?league=nba&market=spread" \
+  -H "X-API-Key: YOUR_API_KEY"
+Por Qué Importa
+La documentación enfatiza que "el line shopping ahorra dinero" a través de ejemplos concretos mostrando cómo -105 vs -110
+cuotas afectan rentabilidad en 1,000 apuestas a tasas de ganancia consistentes.
+ENDPOINT DE COMPARACIÓN DE CUOTAS
+Endpoint: "GET /api/v1/odds/comparison"
+Descripción General
+El endpoint de Comparación de Cuotas permite análisis detallado de cuotas en múltiples casas de apuestas para un evento
+específico, organizado por mercado y selección.
+Especificaciones Principales
+Acceso: Todos los niveles de suscripción (autenticación requerida)
+Página 15
+SharpAPI — Documentación Completa
+Parámetro Clave: "event" (requerido) - Especifica el ID de evento para comparación
+Opciones de Consulta
+El endpoint acepta estos parámetros de filtro:
+•  "market" - Filtrar por tipo de mercado (ej: moneyline, spread)
+•  "sportsbook" - IDs de libro separados por comas para incluir
+El conteo de casa de apuestas disponible varía por nivel: "El nivel Gratuito compara DraftKings y FanDuel; los niveles más
+altos incluyen más libros."
+Estructura de Respuesta
+La respuesta contiene un solo objeto de evento con:
+Datos de nivel de evento:
+•  Identificación de evento (ID, nombre, deporte, liga)
+•  Hora de inicio y estado en vivo
+•  Lista de casas de apuestas disponibles
+Datos de nivel de mercado:
+•  Designación de tipo de mercado
+•  Cálculos de hold (general y por libro)
+•  Array de selección
+Datos de nivel de selección:
+•  Nombre de selección y tipo (casa/visitante, sobre/bajo)
+•  Valor de línea (para spreads/totales)
+•  Cuotas de cada libro (formatos Americano y Decimal)
+•  Identificación de libro mejor/peor
+•  Métrica de spread (diferencia de probabilidad en porcentaje)
+Aplicaciones Prácticas
+Line shopping: Comparar precios entre libros para identificar cuotas óptimas antes de apostar
+Detección de obsolescencia: Revisar timestamps "lastseenat" para ubicar libros con actualizaciones retrasadas
+Análisis de mercado: Comparar hold "mejor_disponible" contra márgenes de libro individual para evaluar valor de shopping
+Funcionalidad Relacionada
+El API ofrece endpoints complementarios para datos de cuotas en bruto, recuperación de mejores cuotas, seguimiento de
+cambios y procesamiento de evento por lotes.
+ENDPOINT DE CUOTAS POR LOTES
+Endpoint: "POST /api/v1/odds/batch"
+Descripción General
+El endpoint de Cuotas de Lote ("POST /api/v1/odds/batch") permite buscar cuotas para múltiples eventos simultáneamente,
+reduciendo latencia y consumo de límite de tasa comparado con solicitudes individuales.
+Página 16
+SharpAPI — Documentación Completa
+Autenticación y Acceso
+Este endpoint requiere una clave API y está "disponible para todos los niveles" del servicio SharpAPI.
+Parámetros de Solicitud
+Campo Requerido:
+•  "event_ids": Array de identificadores de evento para consultar
+Filtros Opcionales:
+•  "sportsbook": Limita resultados a una sola casa de apuestas (por defecto todas disponibles)
+•  "market": Restringe a tipo de mercado específico (por defecto todos)
+Límites de Lote Basados en Nivel
+El máximo de eventos por solicitud varía según el nivel de suscripción:
+•  Gratuito/Hobby: 10 eventos
+•  Pro/Sharp: 50 eventos
+•  Enterprise: 100 eventos
+Exceder el límite de tu nivel devuelve un error de validación.
+Estructura de Respuesta
+Las respuestas incluyen:
+•  data.events: Array conteniendo objetos de evento con cuotas anidadas
+•  data.missing_events: IDs de eventos no encontrados o sin datos de cuotas
+•  meta: Metadatos incluyendo conteos "requested", "found", "missing" y filtros aplicados
+Campos Clave de Respuesta
+Cada evento incluye datos estándar (eventid, name, sport, league, starttime, is_live) más un array de cuotas. Los objetos de
+cuotas contienen detalles de casa de apuestas, tipo de mercado, información de selección, cuotas en formatos Americano y
+Decimal y timestamps indicando cuándo se observaron los datos y cuándo los precios realmente cambiaron.
+Aplicaciones Prácticas
+Los casos de uso principal incluyen cargar todas las cuotas para una pizarra de deportes diarios en una llamada y refrescar
+periódicamente cuotas para eventos rastreados por usuario sin hacer docenas de solicitudes de API separadas.
+ENDPOINT DE LÍNEA DE CIERRE
+Endpoint: "GET /api/v1/odds/closing"
+Descripción General
+El endpoint de Closing Line recupera cuotas por-casa capturadas cuando cada casa de apuestas hace la transición de un
+evento a estado en vivo. Este dato es esencial para análisis de closing-line value (CLV) en apuestas prematch.
+Autenticación y Acceso
+Requiere autenticación con clave API. Disponible exclusivamente para suscriptores de nivel "Pro, Sharp y Enterprise" con la
+característica "closing_line" habilitada.
+Página 17
+SharpAPI — Documentación Completa
+Parámetros Clave
+•  "event_id" (requerido): Identificador de evento que coincide con el formato "/api/v1/events"
+•  "sportsbook" (opcional): Filtrar libros específicos a través de valores separados por comas; alias heredado "books="
+soportado
+Características de Datos
+Las snapshots se preservan en Valkey por exactamente 48 horas post-inicio de evento. Los datos históricos más allá de esta
+ventana requieren el endpoint nivel empresa "/api/v1/historical/odds/closing".
+Estructura de Respuesta
+Las respuestas exitosas incluyen metadatos de evento (deporte, liga, equipos, hora de inicio) y un objeto "books" mapeando
+identificadores de casa de apuestas a arrays de cuotas de cierre. Cada entrada de cuotas contiene:
+•  Tipo de mercado (moneyline, spread, total, player prop)
+•  Detalles de selección con indicadores de tipo
+•  Representaciones de cuotas Americano y Decimal
+•  Valores de línea aplicables
+Estrategia de Caché
+El caché de borde opera en intervalos de 30 segundos; caché del lado del cliente en 10 segundos. Esta ventana de seguridad
+refleja que las snapshots de cierre permanecen inmutables post-captura.
+Manejo de Errores
+Las respuestas comunes incluyen errores de validación para IDs de evento malformados (400), fallos de autenticación (401),
+restricciones de nivel (403) e intentos de servicio (503).
+ENDPOINTS DE EVENTOS
+ENDPOINT DE EQUIPOS
+Endpoint: "GET /api/v1/teams"
+Descripción General
+El endpoint de Equipos ("GET /api/v1/teams") habilita búsquedas en deportes y ligas, proporcionando nombres de equipo,
+alias, membresías de liga y conteos de evento.
+Autenticación
+Requiere  una  clave  API  disponible  en  todos  los  niveles,  incluyendo  el  nivel  Gratuito.  Las  solicitudes  no  autenticadas
+devuelven estado 401.
+Parámetros de Consulta
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar
+ por
+ deporte
+ (basketball,
+football, soccer)
+"league"
+string
+all
+Filtrar por liga (NBA, NFL, EPL)
+"q"
+string
+—
+Buscar  equipos  por  nombre  o  alias
+Página 18
+SharpAPI — Documentación Completa
+(insensible a mayúsculas)
+El parámetro de búsqueda coincide tanto con nombres de equipo como con alias. Por ejemplo, buscando "man city" localiza
+"Manchester City" a través de sus alias.
+Estructura de Respuesta
+Éxito (200) devuelve:
+•  array de data: Objetos de equipo conteniendo:
+•  "id": Identificador único de equipo (formato slug)
+•  "name": Nombre para mostrar
+•  "sport": Categoría de deporte principal
+•  "leagues": Array de membresías de liga
+•  "aliases": Nombres alternativos usados en diferentes casas de apuestas
+•  "event_count": Eventos actuales que involucran el equipo
+•  "live_count": Eventos actualmente activos
+•  objeto meta:
+•  "count": Total de equipos devueltos
+•  "sportfilter", "leaguefilter", "query": Eco de filtros aplicados
+•  "totalevents", "totallive": Conteos agregados de evento
+•  "updated": Timestamp de último refresco (ISO 8601)
+Casos de Uso Principales
+1.  Mapeo de Nombre de Equipo: Acceder al campo de alias para normalizar nombres de equipo entre diferentes casas
+de apuestas
+2.  Búsqueda/Autocompletar: Implementar funcionalidad de type-ahead usando el parámetro "q"
+3.  Descubrimiento de Equipo Activo: Filtrar por conteos de evento para identificar equipos con actividad actual o en vivo
+Endpoints Relacionados
+•  Endpoint de Eventos para datos de evento específicos de equipo
+•  Endpoint de Ligas para listados de liga disponibles
+•  Endpoint de Deportes para categorías de deporte disponibles
+ENDPOINT DE EVENTOS
+Endpoint: "GET /api/v1/events"
+Descripción General
+El endpoint unificado "/api/v1/events" permite listar y buscar eventos con capacidades de filtrado, paginación y búsqueda.
+Reemplaza anteriores endpoints "/schedule", "/events/live" y "/events/search".
+Autenticación
+Requiere  clave  API  a  través  de  header  "X-API-Key",  header  "Authorization:  Bearer"  o  parámetro  de  consulta  "api_key".
+Disponible para todos los niveles de suscripción.
+Parámetros de Consulta Clave
+Página 19
+SharpAPI — Documentación Completa
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar  por  deporte  (separadas  por
+coma: "basketball,football")
+"league"
+string
+all
+Filtrar por liga (ej: "nba,nfl")
+"sportsbook"
+string
+all
+Filtrar por ID de casa de apuestas
+"live"
+boolean
+—
+"true"  solo  en  vivo,  "false"  para
+prematch
+"has_score"
+boolean
+—
+Solo  eventos  con  puntuaciones  en
+vivo
+"date"
+string
+—
+Formato: "YYYY-MM-DD"
+"team"
+string
+—
+Coincidencia  de  nombre  de  equipo
+parcial
+"q"
+string
+—
+Consulta
+ de
+ búsqueda
+ para
+equipos/eventos
+"limit"
+integer
+50
+Resultados por página (máx 200)
+"offset"
+integer
+0
+Desplazamiento de paginación (máx
+5000)
+Estructura de Objeto de Evento
+Los campos principales incluyen:
+•  "id": Identificador de evento canónico para coincidencia cruzada de libros
+•  "external_ids": IDs de evento específicos de casa de apuestas
+•  "sport", "league": Clasificación de deporte y liga
+•  "hometeam", "awayteam": Nombres de equipo
+•  "start_time": Timestamp ISO 8601
+•  "status": "upcoming" o "live"
+•  "book_count": Número de casas de apuestas que ofrecen cuotas
+•  "markets": Array de tipos de mercado disponibles
+•  "game_state": Datos de puntuación en vivo (cuando aplicable)
+Objeto de Estado de Juego
+Incluye: "homescore", "awayscore", "period", "clock", "possession", "istimeout", "powerplay", "last_play"
+Estructura de Respuesta
+Las respuestas exitosas usan un envolvente "data"/"meta" con metadatos de paginación incluyendo "count", "total", "hasmore"
+y "nextoffset".
+Manejo de Errores
+•  401: Clave API inválida o faltante
+•  400: Errores de validación (ej: formato de fecha incorrecto)
+•  429: Límite de tasa excedido
+•  410: Rutas de endpoint desactualizadas devuelven orientación para usar el nuevo endpoint unificado
+Notas de Migración
+•  Los nombres de campo cambiaron de camelCase a snake_case
+•  Los parámetros de consulta usan forma singular
+•  URL base: "https://api.sharpapi.io"
+ENDPOINT DE DETALLES DE EVENTO
+Endpoint: "GET /api/v1/events/{eventId}"
+Página 20
+SharpAPI — Documentación Completa
+Descripción General
+El  endpoint  de  Detalles  de  Evento  recupera  información  comprehensiva  sobre  un  evento  deportivo  único,  incluyendo
+mercados disponibles y cobertura de casa de apuestas.
+Autenticación
+Requiere autenticación con clave API a través de uno de tres métodos:
+•  Header "X-API-Key"
+•  Header "Authorization: Bearer"
+•  Parámetro de consulta "api_key"
+Disponible para todos los niveles de suscripción.
+Parámetros de Ruta
+•  eventId (string, requerido): Identificador único de evento como "evtnbaboslal20260208"
+Encabezados de Respuesta
+Los encabezados estándar de límite de tasa y metadatos incluyen:
+•  "X-RateLimit-Limit": Cuota de solicitud por minuto
+•  "X-RateLimit-Remaining": Solicitudes disponibles en ventana actual
+•  "X-RateLimit-Reset": Timestamp Unix para reinicio de ventana
+•  "X-Data-Delay": Latencia para tu nivel
+•  "X-Request-Id": Identificador de depuración
+Estructura de Objeto de Detalles de Evento
+Campos Principales:
+•  "id": Identificador de evento canónico para coincidencia cruzada de casa de apuestas
+•  "external_ids": Mapeo de identificadores específicos de casa de apuestas para deep linking
+•  "sport", "league": Clasificación de deporte y liga
+•  "hometeam", "awayteam": Nombres de equipo
+•  "start_time": Timestamp ISO 8601
+•  "status": Estado de evento (upcoming, live, final, postponed, cancelled)
+•  "is_live": Booleano indicando juego activo
+Array de Libros: Lista casas de apuestas que ofrecen cuotas, con "marketcount" y timestamps de "lastupdate"
+Array de Mercados: Tipos de mercado disponibles con métricas "selectioncount" y "bookcount"
+Ejemplo de Uso
+cURL:
+curl -X GET "https://api.sharpapi.io/api/v1/events/evt_nba_bos_lal_20260208" \
+   -H "X-API-Key: YOUR_API_KEY"
+Respuesta Exitosa (200)
+Devuelve  objeto  de  evento  único  envuelto  en  propiedad  "data",  incluyendo  arrays  de  libros  y  mercados  con  detalles  de
+cobertura completos.
+Respuestas de Error
+Página 21
+SharpAPI — Documentación Completa
+•  404: Evento no encontrado
+•  401: Clave API faltante o inválida
+Casos de Uso Clave
+•  Comparación de cuotas entre casas de apuestas usando identificadores unificados de evento
+•  Análisis de disponibilidad de mercado entre múltiples libros
+•  Comparación de benchmark nítido usando líneas de referencia de Pinnacle
+•  Deep linking a páginas de casa de apuestas a través de identificadores externos
+Endpoints Relacionados
+•  Events (listar/buscar)
+•  Event Odds (cuotas paginadas)
+•  Event Markets (tipos de mercado)
+•  Odds Snapshot (todos los eventos)
+ENDPOINT DE CUOTAS DE EVENTO
+Endpoint: "GET /api/v1/events/{eventId}/odds"
+Descripción General
+El endpoint de Cuotas de Evento recupera todas las cuotas para un evento específico con capacidades de filtrado opcionales.
+Autenticación
+Requiere clave API a través de header "X-API-Key", header "Authorization: Bearer" o parámetro de consulta. Disponible para
+todos los niveles de suscripción.
+Parámetros de Ruta
+•  eventId (string, requerido): Identificador único de evento (ej: "evtnbaboslal20260208")
+Parámetros de Consulta
+Parámetro
+Tipo
+Defecto
+Propósito
+sportsbook
+string
+all
+Filtrar por proveedor (separadas por
+coma)
+market
+string
+all
+Filtrar
+ por
+ tipo
+ de
+ mercado
+(separadas por coma)
+limit
+integer
+50
+Resultados por página (máx 200)
+offset
+integer
+0
+Desplazamiento de paginación
+Campos de Objeto de Cuotas
+La estructura de datos principal incluye:
+•  id: Identificador único de cuotas
+•  sportsbook: Nombre del proveedor
+•  markettype: Categoría (moneyline, spread, total, playerprop)
+•  selection: Nombre de equipo/jugador u Over/Under
+•  line: Valor de spread/total (null para moneyline)
+•  odds: Formatos Americano, Decimal y probabilidad
+•  lastseenat: Timestamp de frescura de datos
+Página 22
+SharpAPI — Documentación Completa
+•  oddschangedat: Timestamp de cambio de precio
+Formato de Respuesta
+El éxito devuelve array paginado con metadatos incluyendo conteo total, información de paginación y filtros aplicados.
+Respuestas de Error
+•  404: Evento no encontrado
+•  401: Clave API inválida/faltante
+•  429: Límite de tasa excedido
+Endpoints Relacionados
+Links a Eventos, Detalles de Evento, Mercados de Evento, Snapshot de Cuotas y endpoints de Mejores Cuotas.
+ENDPOINT DE MERCADOS DE EVENTO
+Endpoint: "GET /api/v1/events/{eventId}/markets"
+Descripción General
+El  endpoint  de  Mercados  de  Evento  recupera  tipos  de  mercado  disponibles  para  un  evento  específico  y  muestra  cuántas
+casas de apuestas ofrecen cada mercado.
+Autenticación
+Requiere una clave API a través de uno de estos métodos:
+•  Header "X-API-Key"
+•  Header "Authorization: Bearer"
+•  Parámetro de consulta "api_key"
+Disponible para todos los niveles de suscripción.
+Parámetros Clave
+•  eventId (requerido, string): Identificador único de evento como "evtnbaboslal20260208"
+Estructura de Respuesta
+La respuesta incluye arrays de objetos de mercado, cada uno conteniendo:
+•  type: Identificador de mercado (moneyline, pointspread, totalpoints, etc.)
+•  selection_count: Número de selecciones distintas
+•  book_count: Número de casas de apuestas que ofrecen el mercado
+•  selections: Array de selecciones individuales con nombres, tipos, líneas y disponibilidad
+Los objetos de selección proporcionan:
+•  Nombre y tipo (casa, visitante, sobre, bajo)
+•  Valor de línea (cuando aplicable)
+•  Conteo de libro para cada selección
+Aplicaciones Prácticas
+El endpoint ayuda a usuarios a descubrir mercados disponibles antes de solicitar cuotas, identificar cobertura de casa de
+Página 23
+SharpAPI — Documentación Completa
+apuestas para line shopping y verificar disponibilidad de prop de jugador—previniendo llamadas de API desperdiciadas en
+tipos de mercado no disponibles.
+Recursos Relacionados
+•  Endpoint de Cuotas de Evento para recuperar cuotas reales
+•  Endpoint de Mercados para tipos de mercado del sistema
+•  Detalles de Evento para información de mercado incrustada
+ENDPOINTS DE DATOS DE APUESTAS
+ENDPOINT DE SPLITS DE APUESTAS
+Ruta: "GET /api/v1/splits"
+Descripción General
+El endpoint de Splits de Apuestas proporciona datos públicos de distribución de apuestas de casas de apuestas enfocadas en
+recreación  y  enfoque  nítido.  Revela  la  disparidad  entre  volumen  de  tickets  y  volumen  de  dinero  en  diferentes  lados  de
+mercados.
+Conceptos Clave
+Handle % representa la proporción de dólares totales apostados en cada resultado, mientras que Bet % indica el porcentaje
+de tickets individuales colocados. Cuando estos divergen significativamente, señala concentración de dinero profesional.
+Fuentes de Datos
+Dos fuentes principales alimentan este endpoint:
+•  DraftKings: Libro enfocado en recreación (actualiza cada 5 minutos)
+•  Circa Sports: Casa de apuestas amigable con profesionales (actualiza cada 5 minutos)
+Detalles del Endpoint
+Ruta: "GET /api/v1/splits"
+Autenticación: Requiere clave API con nivel Pro ($229/mes) o superior
+Parámetros de Consulta Primarios
+•  "sport": Filtrar por tipo de deporte
+•  "league": Selección de liga específica
+•  "sportsbook": Elegir fuente de datos (draftkings o circa)
+•  "event_id": Objetivar eventos específicos
+•  "market": Limitar a mercados de spread, total o moneyline
+•  "limit": Máximo 200 resultados (defecto 100)
+•  "offset": Para paginación
+Estructura de Respuesta
+La respuesta incluye identificadores de evento, nombres de equipo y tres tipos de mercado (spread, total, moneyline). Cada
+uno contiene valores de línea y distribuciones de porcentaje tanto para handle como para conteos de apuesta.
+Página 24
+SharpAPI — Documentación Completa
+Análisis Histórico
+Ruta: "GET /api/v1/splits/history?eventid={eventid}"
+Este  endpoint  rastrea  evolución  de  splits  en  el  tiempo  con  datos  retenidos  por  48  horas.  La  respuesta  de  historial  usa
+convenciones  de  nombres  de  campo  ligeramente  diferentes  ("book"  en  lugar  de  "sportsbook",  "awayline"  en  lugar  de
+"awayodds").
+Interpretación Práctica
+Cuando  los  porcentajes  de  apuesta  permanecen  bajos  mientras  los  porcentajes  de  handle  son  altos  en  un  lado,  esto
+típicamente indica apuestas profesionales más grandes. Comparar DraftKings contra Circa revela si apostadores públicos y
+profesionales se alinean o no en valor.
+ENDPOINT DE ESTADO DE JUEGO EN VIVO
+Endpoint General: "GET /api/v1/gamestate"
+Endpoint Específico de Deporte: "GET /api/v1/gamestate/{sport}"
+Descripción General
+El  endpoint  de  Estado  de  Juego  en  Vivo  entrega  datos  agregados  y  en  tiempo  real—puntuaciones,  períodos,  relojes,
+información de posesión y métricas específicas de deporte—consolidados en una vista unificada por evento.
+Requisitos de Acceso
+•  Clave API Requerida: Disponible exclusivamente a través del add-on Game State ($79/mes) o nivel Enterprise
+•  Las claves que carecen de este add-on reciben un error "403 tierrestricted" con "addon: "gamestate"" en el cuerpo de
+respuesta
+•  El add-on puede habilitarse desde el dashboard de facturación en cualquier plan pagado
+Endpoints
+•  "GET /api/v1/gamestate" — Todos los deportes con eventos en vivo
+•  "GET /api/v1/gamestate/{sport}" — Filtrado de deporte único (baseball, basketball, football, hockey, soccer, tennis,
+table tennis, cricket, esports, snooker u otros)
+Estructura de Respuesta
+{
+  "data": {
+    "<sport>": {
+      "<event_id>": { ...event state... }
+    }
+  },
+  "updated_at": "ISO timestamp"
+}
+Campos de Datos Principales
+Siempre Presentes:
+•  "hometeam", "awayteam", "sport", "league"
+•  "homescore", "awayscore", "is_live" (siempre true)
+Página 25
+SharpAPI — Documentación Completa
+•  "primarybook", "bookcount"
+Campos Temporales:
+•  "game_period" — "T5" (baseball), "Q3" (basketball), "2H" (soccer)
+•  "game_clock" — Formato de cuenta arriba o cuenta atrás dependiendo del deporte
+Campos Situacionales:
+•  "possession" — "home" o "away"
+•  "server" — Indicador específico de tenis
+•  "last_play" — Descripción dependiente del deporte
+•  "is_timeout" — Bandera booleana
+Ejemplos Específicos de Deporte:
+•  Soccer: "cornershome", "yellowcardsaway", "fouls", "redcards"
+•  Hockey: Indicador de "power_play"
+•  Tennis: "setshome", "setsaway", "server"
+•  Cricket: "wickets*", "overs", "battingteam"
+Indicadores de Frescura
+•   "stale:  true"  —  TTL  de  livestate  del  libro  principal  cayó  por  debajo  del  umbral  de  ~10s;  las  puntuaciones  pueden
+retrasarse
+•  "aggregator_stale: true" — El shard de deporte de SharpAPI no se actualizó en >30s; señal de pipeline más amplia
+Algoritmo de Fusión
+Los datos se combinan entre libros usando tres clases:
+•   Clase  A  (Puntuaciones):  Selección  de  consenso—puntuación  total  más  alta  con  ≥2  respaldo  de  libro  gana  entre
+períodos más avanzados
+•  Clase B (Temporal): Selección de dirección de reloj y rango de período consciente del deporte
+•  Clase C (Situacional): Relleno de prioridad desde clasificación de libro fijo
+Límites de Tasa
+Seguir  los  límites  de  nivel  base  (Hobby:  120  req/min,  Pro:  300,  Sharp:  1,000,  Enterprise:  personalizado).  Las  llamadas
+"/gamestate" cuentan hacia cuotas por minuto.
+Soporte de Streaming
+•  SSE: "GET /api/v1/stream/gamestate" con eventos "gamestate:snapshot" y "gamestate:update"
+•  WebSocket: Suscribirse a canal "gamestate" en "wss://ws.sharpapi.io/ws"
+•  Requiere add-on de WebSocket o nivel Enterprise (además de acceso a Game State)
+Ejemplos de Código
+JavaScript:
+const res = await fetch('https://api.sharpapi.io/api/v1/gamestate/soccer', {
+  headers: { 'X-API-Key': process.env.SHARPAPI_KEY }
+});
+const { data, updated_at } = await res.json();
+Python:
+import httpx, os
+r = httpx.get(
+Página 26
+SharpAPI — Documentación Completa
+  "https://api.sharpapi.io/api/v1/gamestate/soccer",
+  headers={"X-API-Key": os.environ["SHARPAPI_KEY"]}
+)
+body = r.json()
+Problemas Comunes
+•  Errores 403 — Añadir add-on de Game State a través de dashboard de facturación
+•  Objeto de datos vacío — Sin eventos en vivo actuales; reintentar polling
+•  Eventos obsoletos — Filtrar o mostrar indicador de obsolescencia a usuarios
+•  Coincidencias duplicadas — Raro en ligas regionales; usar nombres de equipo como clave de dedup secundaria
+ENDPOINTS DE OPORTUNIDADES
+ENDPOINT DE OPORTUNIDADES +EV
+Endpoint: "GET /api/v1/opportunities/ev"
+Descripción General
+El  endpoint  "GET  /api/v1/opportunities/ev"  identifica  oportunidades  de  apuestas  de  valor  esperado  positivo  entre  múltiples
+casas de apuestas. Requiere nivel Pro o superior con la característica "ev" habilitada.
+Parámetros de Consulta Clave
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar por deporte(s)
+"league"
+string
+all
+Filtrar por liga(s)
+"sportsbook"
+string
+permitido por nivel
+Filtrar por casa de apuestas
+"market"
+string
+all
+Filtrar por tipo de mercado
+"min_ev"
+number
+0
+EV porcentaje mínimo
+"max_ev"
+number
+—
+EV porcentaje máximo
+"live"
+boolean
+—
+Filtro solo en vivo o solo prematch
+"minodds" / "maxodds"
+number
+—
+Rango de cuotas americanas
+"sort"
+string
+"-ev"
+Ordenar  por  EV,  confianza,  kelly  o
+tiempo
+"limit"
+integer
+50
+Resultados por página (máx 200)
+Campos Principales de Respuesta
+Campos Primarios:
+•  "ev_percentage": Valor esperado como porcentaje
+•  "odds_american": Cuotas actuales de casa de apuestas
+•  "odds_decimal": Cuotas en formato decimal
+•  "fair_probability": Probabilidad desvigoriada de libro nítido
+•  "selection": Nombre de equipo/resultado
+•  "market": Tipo de mercado (moneyline, spread, etc.)
+•  "sportsbook": Casa de apuestas que ofrece
+•  "confidence_score": Confianza multi-factor (0-100)
+Página 27
+SharpAPI — Documentación Completa
+•  "kelly_percent": Fracción óptima de apuesta por criterio Kelly
+•  "book_count": Número de libros que ofrecen el mercado
+Metadatos:
+•  "game_id": Identificador de evento asociado
+•  "is_live": Indicador de evento en vivo
+•  "start_time": Timestamp ISO 8601 de hora de evento
+•  "detected_at": Cuándo se identificó la oportunidad
+•  "possibly_stale": Indicador de obsolescencia
+Método de Cálculo de EV
+SharpAPI usa Pinnacle como la referencia de "libro nítido". El proceso involucra:
+1.  Extraer cuotas de libro nítido de Pinnacle
+2.  Aplicar de-vigging usando método de potencia para calcular probabilidad justa
+3.  Comparar contra libros suaves (DraftKings, FanDuel, BetMGM)
+4.  Calcular EV: "(fairprobability × decimalodds - 1) × 100"
+Como se afirma: "Libro nítido usado como referencia...Pinnacle"
+Umbrales de Calidad de EV
+Rango de EV
+Evaluación
+Recomendación
+< 0%
+EV Negativo
+Evitar
+0-2%
+Marginal
+Solo volumen alto
+2-5%
+Bueno
+Umbral estándar
+5%+
+Excelente
+Alta confianza
+Estructura de Ejemplo de Respuesta
+El endpoint devuelve:
+{
+  "success": true,
+  "data": [array de oportunidades],
+  "pagination": {limit, offset, has_more},
+  "meta": {estadísticas de resumen, filtros aplicados}
+}
+Mejores Prácticas
+•  Establecer "min_ev=2" para ventajas significativas
+•  Usar "kelly_percent" para dimensionar apuestas apropiadamente
+•  Filtrar por "confidence_score" para confiabilidad
+•  Monitorear "market_width" para eficiencia de precios
+•  Actuar rápidamente—las oportunidades son fugaces
+•  Rastrear resultados en cientos de apuestas para validación de ventaja
+Manejo de Múltiples Libros
+Cuando múltiples casas de apuestas son +EV en la misma selección, el API devuelve oportunidades separadas para cada
+libro con cuotas distintas y porcentajes de EV, ordenados por EV descendente.
+Página 28
+SharpAPI — Documentación Completa
+ENDPOINT DE OPORTUNIDADES DE ARBITRAGE
+Endpoint: "GET /api/v1/opportunities/arbitrage"
+Descripción General
+El endpoint de Oportunidades de Arbitrage ("GET /api/v1/opportunities/arbitrage") identifica "oportunidades de arbitrage de
+ganancia garantizada entre casas de apuestas" detectando discrepancias de precio.
+Autenticación y Acceso
+•  Requiere clave API (nivel Hobby o superior)
+•  La característica debe estar habilitada en tu cuenta
+Parámetros de Consulta Clave
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar por deporte(s), separados por
+coma
+"league"
+string
+all
+Filtrar por liga(s)
+"sportsbook"
+string
+permitido por nivel
+Filtrar por casa de apuestas
+"market"
+string
+all
+Filtrado de tipo de mercado
+"min_profit"
+number
+0.5
+Porcentaje de ganancia mínima
+"live"
+boolean
+—
+Filtrado en vivo vs prematch
+"format"
+string
+json
+Formato de respuesta (json/csv)
+"limit"
+integer
+50
+Resultados por página (máx 200)
+"offset"
+integer
+0
+Desplazamiento de paginación
+Concepto Principal
+El arbitrage existe cuando las probabilidades implícitas combinadas en todos los resultados del mercado totalizan menos del
+100%: Ganancia % = (100 / implied_total) - 100
+Estructura de Respuesta
+Cada arbitrage incluye:
+•  Detalles del evento (nombre, deporte, liga, tipo de mercado)
+•  "profit_percent" - Porcentaje de ganancia garantizada
+•  "implied_total" - Suma de probabilidades implícitas
+•  Array "legs" - Componentes individuales de apuesta con apuestas, cuotas, detalles de casa de apuestas
+•  Timestamps e indicadores de obsolescencia
+Mejores Prácticas
+La documentación aconseja a usuarios actuar rápidamente, verificar cuotas antes de colocar apuestas, redondear apuestas
+para  evitar  detección  y  diversificar  entre  casas  de  apuestas  para  reducir  riesgo  de  limitación  de  cuenta.  Señala  que  la
+actividad de arbitrage puede resultar en limitaciones de cuenta de casas de apuestas.
+ENDPOINT DE OPORTUNIDADES DE MIDDLES
+Endpoint: "GET /api/v1/opportunities/middles"
+Página 29
+SharpAPI — Documentación Completa
+Descripción General
+El endpoint de Middles identifica oportunidades de apuestas donde dos casas de apuestas ofrecen diferentes líneas en el
+mismo mercado, permitiendo ambas apuestas ganar potencialmente simultáneamente si el resultado final cae dentro de la
+brecha entre las líneas.
+Autenticación y Acceso
+•  Endpoint: "GET /api/v1/opportunities/middles"
+•  Requisito: Clave API con nivel Pro o superior
+•  Límites de Tasa: 300 solicitudes por ventana
+Parámetros de Consulta Clave
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar  por  deporte  (separados  por
+coma)
+"league"
+string
+all
+Filtrar  por  liga  como  "nba",  "nfl",
+"nhl"
+"sportsbook"
+string
+permitido por nivel
+Restricciones específicas de libro se
+aplican
+"market"
+string
+all
+Tipos
+ de
+ mercado
+ como
+"pointspread", "totalpoints"
+"min_size"
+number
+0.5
+Tamaño  de  brecha  mínima  en
+puntos
+"live"
+boolean
+—
+Filtrado
+ solo
+ en
+ vivo
+ o
+ solo
+prematch
+"maxoddsage"
+number
+—
+Antigüedad  máxima  de  cuotas  en
+segundos
+"sort"
+string
+quality
+Ordenar
+ por
+ "quality",
+ "ev",
+"probability" o "middle_size"
+"limit"
+integer
+50
+Resultados por página (máx 200)
+Estructura de Respuesta
+La respuesta exitosa 200 incluye:
+•  Detalles del middle: info del evento, nombres de equipos, tipo de mercado
+•  Objetos de lado: libro, selección, línea, cuotas (Americano/Decimal), probabilidad implícita
+•  Métricas: tamaño del middle, probabilidad, valor esperado, porcentaje ROI
+•  Datos de riesgo: pérdida de peor caso, ganancia de mejor caso, porcentaje de punto de equilibrio
+•  Advertencias: banderas de probabilidad alta, alertas de cuotas obsoletas, indicadores de ganancia garantizada
+Conceptos Principales
+¿Qué es un Middle?
+Cuando las casas de apuestas divergen en valores de línea, puedes colocar apuestas opuestas capturando ambos lados. Si
+los  resultados  caen  entre  las  líneas,  ambas  apuestas  ganan  simultáneamente—a  diferencia  del  arbitrage,  esto  no  es
+garantizado pero ofrece pagos sustanciales cuando tiene éxito.
+Ejemplo de Estructura:
+Si una casa ofrece Chiefs a -2.5 y otra ofrece Bills a +7.5, resultados donde Chiefs gana por 3-7 puntos dispara un "middle hit"
+donde ambas apuestas tienen éxito.
+Números Clave:
+Los deportes exhiben patrones de puntuación (NFL: 3 y 7 puntos son márgenes comunes) que matemáticamente incrementan
+la probabilidad del middle dentro de esos rangos.
+Indicador de Ganancia Garantizada:
+Cuando  "isguaranteedprofit"  devuelve  true,  el  middle  se  convierte  en  sin  riesgo—incluso  escenarios  perdedores  producen
+retornos positivos porque las cuotas combinadas crean condiciones de arbitrage.
+Página 30
+SharpAPI — Documentación Completa
+Campos Importantes en Respuesta
+•  "middle_size": Ancho de brecha en puntos
+•  "middle_probability": Probabilidad de que resultado caiga en brecha
+•  "expected_value": Ganancia de dólar por $100 apostado
+•  "roi_percentage": Retorno como porcentaje de apuesta total
+•  "oddsageseconds": Indicador de obsolescencia para toma de decisión
+•  "key_numbers": Valores enteros específicos con probabilidad elevada
+•  "warnings": Alertas accionables sobre frescura y riesgo
+Recomendaciones Prácticas
+1.  Filtrar por "min_size=1.0" o superior para identificar oportunidades significativas
+2.  Priorizar oportunidades que contienen números clave específicos del deporte
+3.  Objetivar "isguaranteedprofit=true" para posiciones sin riesgo
+4.  Revisar "oddsageseconds"—las cuotas más antiguas pueden haber ya cambiado
+5.  Usar el endpoint de detalle dedicado a través de "GET /opportunities/middles/:id" para revisión de middle individual
+6.  Suscribirse a canales de streaming para eventos de detección en tiempo real
+Recursos Relacionados
+•  Endpoint de Resumen de Middles para estadísticas agregadas
+•  Oportunidades +EV para apuestas de valor positivo
+•  Endpoint de Arbitrage para oportunidades de ganancia garantizada
+•  Streams SSE/WebSocket para alertas de oportunidad en vivo
+ENDPOINT DE RESUMEN DE MIDDLES
+Endpoint: "GET /api/v1/opportunities/middles/summary"
+Descripción General
+El endpoint de Resumen de Middles proporciona estadísticas agregadas para oportunidades de apuestas de middles actuales
+sin devolver la lista completa. Utiliza los mismos datos subyacentes que el endpoint Middles completo.
+Autenticación y Acceso
+•  Requiere autenticación con clave API
+•  Nivel Pro o superior requerido
+Parámetros de Consulta
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Acotar  resultados  por  deporte  (ej:
+basketball, football)
+"league"
+string
+all
+Acotar  resultados  por  liga  (ej:  nba,
+nfl, nhl)
+Estructura de Respuesta
+Éxito (200)
+El endpoint devuelve datos agregados incluyendo:
+Página 31
+SharpAPI — Documentación Completa
+•  Conteos: Total de oportunidades, conteo de EV positivo, conteo de ganancia garantizada, conteo de prop de jugador
+•  Desglose: Distribución entre deportes, mercados y casas de apuestas
+•  Métricas: Tamaño medio del middle (puntos), probabilidad y valor esperado
+•  Mejor Oportunidad: Resumen de EV más alto con detalles de deporte y mercado
+•  Números Clave: Conteo de oportunidades que involucran números clave específicos del deporte
+Campos Principales de Respuesta
+Campo
+Tipo
+Descripción
+"total"
+integer
+Conteo actual de oportunidades middle
+"positiveevcount"
+integer
+"Oportunidades con valor esperado positivo"
+"avgmiddlesize"
+number
+Tamaño de brecha en puntos entre posiciones
+"bysport"/"bymarket"/"by_sportsbook"
+objects
+Desglose categórico
+Aplicaciones Prácticas
+1.  Widgets de Dashboard: Mostrar conteos de oportunidad y promedios sin buscar datasets completos
+2.  Polling Eficiente: Revisar resumen en intervalos más cortos; buscar datos Middles completos solo cuando cambian
+conteos
+3.  Detección de Cambio: El sistema de caché retiene datos por 10 segundos respetando límites de tasa estándar
+Manejo de Errores
+•  401 No Autorizado: Clave API inválida o faltante
+•  403 Nivel Requerido: La cuenta carece del nivel de suscripción necesario
+ENDPOINT DE OPORTUNIDADES DE LOW HOLD
+Endpoint: "GET /api/v1/opportunities/low_hold"
+Descripción General
+El endpoint de Low Hold ("GET /api/v1/opportunities/low_hold") identifica mercados con la vig más baja (margen de casa de
+apuestas) entre múltiples casas de apuestas, representando las líneas más ajustadas disponibles.
+Requisitos de Autenticación
+•  Requiere autenticación con clave API
+•  Nivel Pro o superior requerido
+•  La cuenta debe tener la característica "low_hold" habilitada
+Parámetros de Consulta Clave
+Parámetro
+Tipo
+Defecto
+Propósito
+"sport"
+string
+all
+Filtrar por deporte(s)
+"league"
+string
+all
+Filtrar por liga(s)
+"max_hold"
+number
+5.0
+Umbral porcentaje de hold máximo
+"market"
+string
+all
+Filtrar por tipo de mercado
+"live"
+boolean
+—
+True  solo  en  vivo,  false  solo
+prematch
+"state"
+string
+pa
+Estado  de  EE.UU.  para  generación
+Página 32
+SharpAPI — Documentación Completa
+de deep link
+"limit"
+integer
+50
+Resultados por página (máx 200)
+Estructura de Respuesta
+El endpoint devuelve oportunidades con:
+•  Detalles del evento: nombre, deporte, liga, hora de inicio
+•  Información de mercado: tipo, línea, porcentaje de hold
+•   Objetos  de  lado  (hasta  3):  selecciones,  cuotas  (Americano/Decimal),  probabilidades  implícitas,  casas  de  apuestas
+participantes, deep links
+•  Metadatos: Puntuación de confianza, edad de cuotas, indicadores de obsolescencia
+Cálculo de Hold
+"Hold % = (impliedprobside1 + impliedprobside2 - 1) × 100" — representa el margen integrado de la casa de apuestas en
+cualquier mercado.
+Orientación Práctica
+•  Los holds por debajo de 1.5% se consideran excelentes
+•  Las oportunidades de low-hold son más comunes que el arbitrage pero menos valiosas
+•  Combinar datos de low-hold con análisis +EV optimiza retornos
+•  Verificar la bandera "possibly_stale" antes de actuar en oportunidades
+•  Suscribirse a eventos de streaming para alertas en tiempo real
+ENLACES PROFUNDOS Y STREAMING
+ENDPOINT DE ENLACES PROFUNDOS
+Endpoint de Batch de Enlaces Profundos: "POST /api/v1/deeplinks/batch"
+Redirección de Enlace Profundo: "GET /api/v1/deeplink/{id}"
+Descripción General
+La  API  de  Enlaces  Profundos  genera  URLs  de  redirección  de  casa  de  apuestas  desde  IDs  de  cuotas  o  IDs  hash  de
+oportunidad, permitiendo navegación directa de usuario a páginas de apuestas.
+Batch de Enlaces Profundos
+•  Procesa 1-500 IDs en una sola solicitud
+•  Devuelve rutas de redirección (no URLs directas)
+•  Requiere autenticación de API (nivel Hobby+)
+Redirección de Enlace Profundo
+•  Endpoint público, no requiere autenticación
+•  Entrega redirección HTTP 302 Found
+•  Acepta IDs de cuotas o IDs hash de oportunidad
+Página 33
+SharpAPI — Documentación Completa
+Parámetros de Solicitud
+El endpoint de batch acepta:
+•  "ids": Array de IDs de cuotas o IDs hash de oportunidad (requerido)
+•  "state": Código de estado de EE.UU. para URLs regionales, por defecto Pennsylvania
+El endpoint de redirección soporta:
+•  "state": Parámetro de URL de casa de apuestas regional
+•  "book": Filtrar para oportunidades multi-libro
+•  "fallback": URL alternativa si ID no se encuentra
+Estructura de Respuesta
+Las  respuestas  exitosas  de  batch  devuelven  un  objeto  mapeando  cada  ID  a  ya  sea  una  ruta  de  redirección  (formato:
+"/api/v1/deeplink/{id}") o "null" para IDs no disponibles, plus un timestamp ISO 8601.
+Las  respuestas  de  redirección  proporcionan  encabezados  HTTP  302  con  URLs  de  destino  de  casa  de  apuestas  y  un
+encabezado "X-Deep-Link-Type" indicando especificidad de enlace (resultado, evento o homepage).
+Casas de Apuestas Soportadas
+21 de 28 casas de apuestas integradas soportan enlaces profundos, incluyendo DraftKings, FanDuel, BetMGM, Caesars y
+Pinnacle. Cinco libros carecen de soporte: Bet105, Bookmaker, Fliff, Rebet y SABA.
+ENDPOINT DE STREAM UNIFICADO (SSE)
+Endpoint: "GET /api/v1/stream"
+Descripción General
+El  endpoint  de  Stream  SSE  ("GET  /api/v1/stream")  entrega  actualizaciones  de  cuotas  y  oportunidades  en  tiempo  real  vía
+Server-Sent Events. Requiere el Add-on de WebSocket ($99/mes) o nivel Enterprise.
+Autenticación
+Dos métodos son soportados:
+•  Encabezado: "X-API-Key: skliveyour_key" (recomendado para lado del servidor)
+•  Parámetro de consulta: "?apikey=skliveyourkey" (requerido para EventSource del navegador)
+Parámetros de Consulta Clave
+•  "channel": Elegir entre "odds", "opportunities", "gamestate" (Enterprise) u "all"
+•  "sport", "sportsbook", "league", "event", "market": Filtrar datos de streaming
+•  "min_ev": Porcentaje mínimo de EV (defecto 2.0%)
+•  "min_profit": Ganancia mínima de arbitrage (defecto 0.5%)
+•  "state": Código de estado de EE.UU. para deep links de casa de apuestas
+Tipos de Evento
+El stream entrega múltiples categorías de evento:
+Conexión: El evento "connected" señala establecimiento de stream con ID único y detalles de filtro.
+Página 34
+SharpAPI — Documentación Completa
+Snapshots de datos: Los eventos "snapshot" iniciales contienen objetos de cuotas completos, seguidos por confirmación de
+"snapshot:complete".
+Actualizaciones  de  cuotas:  El  evento  "odds:update"  envía  "payloads  de  delta  compactos"  conteniendo  solo  campos
+cambiados—"id", "oddsamerican", "oddsdecimal", "oddsprobability", "line", "islive" y "oddschangedat".
+Oportunidades:  Eventos  como  "ev:detected",  "arb:detected",  "middles:detected"  y  "low_hold:detected"  te  alertan  sobre
+oportunidades de trading.
+Mantenimiento: Los eventos "heartbeat" llegan cada 30 segundos; "error" y "odds:removed" proporcionan actualizaciones de
+estado.
+Patrón de Implementación Crítico
+Los clientes deben mantener un mapa local de cuotas del snapshot, luego fusionar actualizaciones de delta entrantes por ID.
+Los campos estáticos (casa de apuestas, tipo de mercado, selección) solo aparecen en snapshots, no en deltas.
+Límites de Stream
+•  Add-on de WebSocket: 10 streams concurrentes
+•  Enterprise: Límites personalizados
+•  Exceder límites devuelve HTTP 429 con "toomanystreams"
+Reconexión
+SSE soporta reconexión automática vía encabezado "Last-Event-ID". Al reconectar, los clientes reciben un snapshot fresco y
+deben limpiar estado local para evitar mezclar datos obsoletos.
+Optimización de Ancho de Banda
+El enfoque de delta compacto reduce ancho de banda aproximadamente 5x comparado con enviar objetos completos en cada
+cambio.
+API DE STREAM WEBSOCKET
+Endpoint: "wss://ws.sharpapi.io"
+Descripción General
+El  endpoint  de  WebSocket  de  SharpAPI  ("wss://ws.sharpapi.io")  proporciona  "una  conexión  persistente,  full-duplex"  para
+actualizaciones  de  cuotas  y  oportunidades  de  apuestas  en  tiempo  real.  El  servicio  requiere  un  Add-on  de  WebSocket
+($99/mes) en niveles pagados o acceso Enterprise.
+Autenticación y Conexión
+Parámetro de Clave API Requerido:
+wss://ws.sharpapi.io?api_key=sk_live_your_key
+Los filtros iniciales y canales opcionales pueden pasarse como parámetros de consulta junto con la clave API.
+Parámetros de Consulta
+Parámetro
+Tipo
+Defecto
+Propósito
+"api_key"
+string
+Requerido
+Tu token de autenticación
+Página 35
+SharpAPI — Documentación Completa
+"channels"
+string
+all
+Separados
+ por
+ coma:
+"ev,arbitrage,middles,low_hold,odds
+"
+"sport"
+string
+all
+Filtrar
+ por
+ nombre
+ de
+ deporte
+(basketball, football, etc.)
+"sportsbook"
+string
+permitido por nivel
+Nombres  de  libro  separados  por
+coma
+"league"
+string
+all
+Nombres  de  liga  separados  por
+coma
+"market"
+string
+all
+Tipos
+ de
+ mercado
+ (moneyline,
+point_spread, etc.)
+"event_id"
+string
+all
+Identificadores
+ de
+ evento
+específicos
+"min_ev"
+number
+2.0
+Umbral porcentaje mínimo de EV
+"min_profit"
+number
+0.5
+Ganancia
+ mínima
+ para
+arbitrage/low-hold
+"min_odds"
+number
+—
+Valor mínimo de cuotas americanas
+"max_odds"
+number
+—
+Valor máximo de cuotas americanas
+"state"
+string
+—
+Código  de  estado  de  EE.UU.  para
+targeting de deep link
+"resume"
+boolean
+false
+Saltar
+ snapshot
+ inicial
+ en
+reconexión
+"from_seq"
+integer
+—
+Reproducir  eventos  perdidos  desde
+número de secuencia
+Tipos de Mensaje
+Cliente a Servidor
+Mensaje de Suscripción:
+{
+  "type": "subscribe",
+  "channels": ["ev", "odds"],
+  "filters": {
+    "sports": ["basketball"],
+    "sportsbooks": ["draftkings"],
+    "leagues": ["nba"],
+    "markets": ["moneyline"],
+    "eventIds": ["32825-35775-2026-02-08"],
+    "min_ev": 3.0,
+    "min_profit": 1.5
+  }
+}
+Ping (Keepalive):
+{ "type": "ping" }
+Servidor a Cliente
+Conectado (Respuesta Inicial):
+Contiene  metadatos  de  stream  incluyendo  nivel,  características  y  número  de  secuencia  global  para  propósitos  de
+reproducción.
+Suscrito: Confirma canales activos y filtros aplicados.
+Snapshot de Oportunidades: Lote inicial de oportunidades para canales suscritos (ev, arbitrage, middles, low_hold).
+Inicial: Snapshot de cuotas por casa de apuestas (dividido por libro, hasta 1000 cuotas por mensaje).
+Snapshot:Complete: Señala terminación de toda transmisión de datos inicial.
+Actualizaciones de Cuotas:
+•  "odds:update" — Cambios de cuotas incrementales
+Página 36
+SharpAPI — Documentación Completa
+•  "odds:removed" — Cuotas eliminadas o mercados cerrados
+Alertas de Oportunidad:
+•  "ev:detected" / "ev:expired" — Oportunidades de valor
+•  "arb:detected" / "arb:expired" — Oportunidades de arbitrage
+•  "middles:detected" / "middles:expired" — Oportunidades de middles
+•  "lowhold:detected" / "lowhold:expired" — Oportunidades de low-hold
+Mantenimiento:
+•  "heartbeat" — Keep-alive enviado cada 30 segundos
+•  "pong" — Respuesta al ping del cliente
+•  "error" — Errores de protocolo o validación
+Estructura de Datos de Oportunidad
+Todos los mensajes de oportunidad usan nombres snake_case:
+Ejemplo de Oportunidad +EV:
+{
+  "id": "a1b2c3d4e5f6",
+  "game_id": "nba_indianapacers_torontoraptors_2026-02-08",
+  "ev_percentage": 4.35,
+  "selection": "Tyrese Haliburton Over 22.5",
+  "market": "player_points",
+  "sportsbook": "draftkings",
+  "confidence_score": 72,
+  "kelly_percent": 0.038,
+  "detected_at": "2026-02-08T18:47:20.000Z"
+}
+Estructura de Oportunidad de Arbitrage:
+Contiene dos piernas con selecciones opuestas entre diferentes libros, incluyendo probabilidades implícitas y porcentajes de
+apuesta que totalizan menos del 100%.
+Estructura de Oportunidad de Middle:
+Cuenta con side1 y side2 con spreads de puntos diferentes entre libros, middlesize indicando brecha favorable y métricas de
+expectedvalue/roi_percentage.
+Estructura de Oportunidad de Low-Hold:
+Muestra porcentaje de hold, array allbooks y selecciones side1/side2 con deeplinks para acceso de casa de apuestas.
+Números de Secuencia y Reconexión
+Cada mensaje incluye un campo "seq" (contador por conexión). El mensaje "connected" también proporciona "global_seq"
+(contador de evento del servidor).
+Reconexión con Reproducción (Buffer de 2 minutos, máx 2000 eventos):
+wss://ws.sharpapi.io?api_key=KEY&channels=ev,odds&resume=true&from_seq=12900
+Los mensajes reproducidos incluyen ""replay": true" y "global_seq" actual para identificación.
+Códigos de Error
+Códigos de Cierre de Conexión WebSocket:
+•  "1000" — Cierre normal
+Página 37
+SharpAPI — Documentación Completa
+•  "4001" — Fallo de autenticación (revisar clave API)
+•  "4003" — Sin acceso de streaming (actualizar plan)
+•  "4029" — Límite de stream excedido (máx 10 concurrentes)
+Límites de Stream Concurrentes
+Plan
+Máximo
+Add-on de WebSocket
+10 streams
+Enterprise
+Personalizado
+Ejemplos de Código
+Implementación del Navegador:
+const ws = new WebSocket('wss://ws.sharpapi.io?api_key=YOUR_KEY&channels=ev,odds');
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === 'connected') console.log(msg.tier);
+  if (msg.type === 'ev:detected') console.log(msg.data);
+};
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type: 'ping'}));
+}, 25000);
+Actualizar Suscripción Sin Reconexión:
+ws.send(JSON.stringify({
+  type: 'subscribe',
+  channels: ['low_hold'],
+  filters: { sports: ['football'], leagues: ['nfl'] }
+}));
+Mejores Prácticas
+1.  Suscribirse a canales específicos solo ("Usar canales para reducir tamaño de payload")
+2.  Transmitir pings cada 25 segundos para prevenir timeouts de proxy
+3.  Aplicar filtros en tiempo de conexión para minimizar volumen de datos
+4.  Establecer umbrales "minev" y "minprofit" del lado del servidor
+5.  Usar mensaje "subscribe" para modificar filtros sin reconectar
+6.  Rastrear números de secuencia para capacidad de reconexión con reproducción
+7.  Implementar estrategia de reconexión con backoff exponencial
+8.  Esperar "snapshot:complete" antes de ocultar indicadores de carga
+9.  Procesar "odds:removed" para mantener estado local preciso
+10.  Cerrar conexiones no usadas (máx 10 límite concurrente)
+Recursos Relacionados
+•  API de Stream SSE (alternativa a WebSocket)
+•  Especificación AsyncAPI 3.0 en "/asyncapi.yaml"
+•  Guía de iniciación y descripción general de streaming
+•  Implementaciones SDK de TypeScript, Python y MCP
+Página 38
+SharpAPI — Documentación Completa
+ENDPOINTS DE CUENTA
+ENDPOINT DE INFORMACIÓN DE CUENTA
+Endpoint: "GET /api/v1/account"
+Descripción General
+El endpoint de Información de Cuenta ("GET /api/v1/account") proporciona detalles de cuenta, nivel de suscripción, límites de
+tasa y características habilitadas. Reemplaza el anterior endpoint "/me" con un formato de respuesta v1 actualizado.
+Autenticación
+Requiere una clave API y está disponible en todos los niveles de suscripción.
+Ejemplo de Solicitud
+curl -X GET "https://api.sharpapi.io/api/v1/account" \
+  -H "X-API-Key: YOUR_API_KEY"
+Estructura de Respuesta (HTTP 200)
+Objeto de Clave:
+•  "id": Identificador de clave API
+•  "tier": Nivel de suscripción (free, hobby, pro, sharp, enterprise)
+•  "user_id": Identificador de usuario (opcional)
+Objeto de Límites:
+•  "requestsperminute": Cuota de llamadas de API
+•  "max_streams": Capacidad de stream concurrente
+•  "oddsdelayseconds": Latencia de datos (0 para pagado, 60 para gratuito)
+•  "max_books": Conteo de casa de apuestas accesible
+Objeto de Características:
+•  "ev": Acceso a oportunidades +EV
+•  "arbitrage": Capacidad de detección de arbitrage
+•  "middles": Característica de detección de middles
+•  "streaming": Acceso a SSE/WebSocket
+Campos Adicionales:
+•  "addons": Adiciones premium activas (ej: WebSocket)
+•  "streaming_trial": Detalles opcionales de prueba incluyendo estado y expiración
+Encabezados de Respuesta
+La información de límite de tasa y frescura de datos se incluye ("X-RateLimit-Limit", "X-Data-Delay", etc.)
+Respuesta de Error (HTTP 401)
+Devuelve "Clave API inválida o faltante" para fallos de autenticación.
+Uso Práctico
+Los desarrolladores deben consultar este endpoint antes de acceder a características para "Revisar Acceso a Características
+Página 39
+SharpAPI — Documentación Completa
+Antes de Hacer Solicitudes."
+ENDPOINT DE ESTADÍSTICAS DE USO
+Endpoint: "GET /api/v1/account/usage"
+Descripción General
+El endpoint de Estadísticas de Uso ("GET /api/v1/account/usage") proporciona métricas a nivel de cuenta incluyendo conteos
+de  solicitud,  estado  de  límite  de  tasa  e  información  de  stream  activo.  Está  "disponible  para  todos  los  niveles"  y  requiere
+autenticación con clave API.
+Campos Principales de Respuesta
+Métricas de Solicitud:
+•  Conteos de solicitud diarios, semanales y mensuales
+•  Límite de tasa por minuto (300 solicitudes/minuto en el ejemplo)
+•  Solicitudes restantes en ventana actual
+•  Timestamp de reinicio en formato ISO 8601
+Información de Stream:
+•  Streams concurrentes activos
+•  Máximo de streams permitidos (varía por nivel; 0 si streaming deshabilitado)
+Período de Facturación:
+•  Fechas de inicio y fin para el mes de facturación actual
+Ejemplo de Uso
+La documentación incluye implementaciones prácticas:
+1.  Monitoreo de Límite de Tasa – Calcular porcentaje de uso y rastrear tiempos de reinicio
+2.  Verificación de Disponibilidad de Stream – Verificar capacidad antes de establecer nuevas conexiones
+Encabezados de Respuesta
+El  endpoint  devuelve  metadatos  de  límite  de  tasa:  "X-RateLimit-Limit",  "X-RateLimit-Remaining"  y  "X-RateLimit-Reset"
+(timestamp Unix).
+Autenticación
+Clave API estándar requerida a través del header "X-API-Key". Devuelve error 401 para credenciales inválidas.
+Recursos Relacionados
+•  Endpoint de Información de Cuenta (detalles de cuenta y información de nivel)
+•  Gestión de Claves API (manejo de credenciales)
+•  Documentación de Precios (límites específicos de nivel)
+ENDPOINT DE GESTIÓN DE CLAVES API
+Endpoint: "GET /api/v1/account/keys"
+Página 40
+SharpAPI — Documentación Completa
+Descripción General
+El  endpoint  de  Gestión  de  Claves  API  habilita  crear,  listar,  rotar  y  eliminar  claves  API.  Todas  las  operaciones  requieren
+autenticación a través de una clave API existente y están "Disponibles para todos los niveles."
+Operaciones Principales
+Listar Claves API
+•  Endpoint: "GET /api/v1/account/keys"
+•  Devuelve: Array de objetos de clave con campos: "id", "idmasked", "name", "tier", "isactive", "createdat", "updatedat"
+•  Respuesta incluye: Metadatos con conteo, detalles de paginación y timestamp de última actualización
+Crear Clave API
+•  Endpoint: "POST /api/v1/account/keys"
+•  Entrada requerida: Nombre de clave (string)
+•  Nota crítica: "El valor de clave completo se devuelve solo una vez en tiempo de creación. Almacenalo seguramente
+inmediatamente."
+•  Respuesta: Contiene valor de clave completo (no será mostrado nuevamente), ID, nombre y nivel
+Eliminar Clave API
+•  Endpoint: "DELETE /api/v1/account/keys/{keyId}"
+•  Restricción: No puedes eliminar la clave que se autentica
+•  Efecto: "Esta acción es irreversible"
+•  Resultado: Revocación inmediata de acceso para aplicaciones usando esa clave
+Rotar Clave API
+•  Endpoint: "POST /api/v1/account/keys/{keyId}/rotate"
+•  Función: Genera nuevo valor de clave; la clave anterior "es revocada el instante en que la rotación se completa"
+•  Nueva clave: Solo mostrada una vez; requiere actualizaciones inmediatas de configuración de aplicación
+Recomendaciones de Seguridad
+La  documentación  enfatiza:  usar  nombres  descriptivos,  rotar  regularmente,  mantener  claves  separadas  por  entorno,
+almacenar en gestores de secretos (nunca hardcoded) y revocar claves comprometidas inmediatamente.
+ENDPOINTS EMPRESARIALES
+DESCRIPCIÓN GENERAL DE ENDPOINTS EMPRESARIALES
+Los endpoints empresariales avanzados están disponibles exclusivamente para suscriptores de nivel Enterprise.
+Catálogo de Futuros
+El endpoint "Obtener el catálogo de futuros — mercados de futuros disponibles en casas de apuestas" permite recuperar
+mercados de futuros. Los usuarios pueden filtrar por deporte, liga y casa de apuestas con soporte de paginación (máx 200
+resultados por página).
+Página 41
+SharpAPI — Documentación Completa
+Cuotas de Futuros
+Un segundo endpoint recupera "cuotas para mercados de futuros" con capacidades de filtrado similares más filtrado de tipo
+de mercado. Ambos endpoints requieren una suscripción Enterprise.
+Detalles Clave
+•  Requisito de Acceso: Los niveles de suscripción inferiores reciben un error "403 tier_restricted"
+•  Parámetros de Consulta: Ambos endpoints soportan filtrado por deporte(s), liga(s), casa de apuestas, con paginación
+personalizable (limit: 50-200, offset comenzando en 0)
+•  Filtro de Cuotas de Futuros: Incluye filtrado de tipo de mercado adicional no presente en el endpoint de catálogo
+VERIFICACIÓN DE SALUD
+ENDPOINT DE VERIFICACIÓN DE SALUD
+Endpoint: "GET /api/v1/health"
+Descripción General
+La  Verificación  de  Salud  es  un  endpoint  de  API  público  que  monitorea  el  estado  operacional  de  SharpAPI  sin  requerir
+autenticación.
+Campos de Respuesta Clave
+Nivel Superior:
+•  "status": Devuelve "ok", "degraded" o "down"
+•  "version": Identificador de versión de API actual
+•  "timestamp": Tiempo de verificación en formato ISO 8601
+•  "checks": Objeto conteniendo diagnósticos de subsistema
+Verificaciones Individuales:
+1.  Redis - Conectividad del backend con medición de latencia
+2.  Data - Validación de frescura de snapshot
+3.  Schema - Verificación de completitud de campo
+Lógica de Determinación de Estado
+El estado general refleja el componente con peor rendimiento:
+•  "ok" (HTTP 200) - Todos los subsistemas operacionales
+•  "degraded" (HTTP 200) - Rendimiento reducido o datos obsoletos presentes
+•  "down" (HTTP 503) - Servicio no disponible
+Aplicaciones Prácticas
+Integración de Monitoreo: Incorporar en plataformas de observabilidad para detectar interrupciones automáticamente
+Validación  Pre-Solicitud:  Revisar  estado  de  salud  antes  de  ejecutar  llamadas  de  API  críticas  para  manejar  degradación
+gracefully
+Página 42
+SharpAPI — Documentación Completa
+Reporte de Dashboard: Mostrar estado de servicio en tiempo real incluyendo métricas de latencia y diagnósticos a nivel de
+componente
+Ejemplo de Estructura de Respuesta
+Las  respuestas  exitosas  incluyen  timestamps,  mediciones  de  latencia  (en  milisegundos)  y  mensajes  de  estado  legibles
+describiendo condiciones como "5 snapshots de casa de apuestas disponibles" o notificaciones de drift de schema.
+DESCRIPCIÓN GENERAL DE STREAMING
+¿Por Qué Streaming?
+SharpAPI proporciona actualizaciones de cuotas y oportunidades en tiempo real a través de dos protocolos de streaming:
+SSE (Server-Sent Events) y WebSocket, ambos entregando "latencia sub-segundo" comparado con latencia del polling REST
+de 30-60 segundos.
+Problema que Resuelve el Streaming
+El polling REST tradicional requiere frecuentes solicitudes de payload completo, creando demoras significativas. El streaming
+resuelve  esto  enviando  solo  datos  cambiados  conforme  ocurren,  reduciendo  tanto  latencia  como  consumo  de  ancho  de
+banda.
+Dos Opciones de Protocolo
+SSE (Server-Sent Events)
+•  Comunicación HTTP, unidireccional
+•  Reconexión automática vía "Last-Event-ID"
+•  Ideal para aplicaciones consumidoras simples
+•  Soporte nativo del navegador vía "EventSource"
+WebSocket
+•  Protocolo bidireccional "ws://" o "wss://"
+•  Actualizaciones dinámicas de filtro sin reconectar
+•  Reconexión manual con backoff requerida
+•  Mejor para aplicaciones que necesitan comunicación bidireccional
+Tipos de Evento Principales
+La plataforma transmite múltiples categorías de evento:
+•  "snapshot" / "snapshot:complete" — Dumps de datos iniciales
+•  "odds:update" — Deltas compactos con solo campos cambiados
+•  "ev:detected" / "ev:expired" — Oportunidades de apuestas de valor
+•  "arb:detected" / "arb:expired" — Oportunidades de arbitrage
+•  "middles:detected" / "middles:expired" — Oportunidades de middles
+•  "heartbeat" — Señales de keep-alive cada 30 segundos
+Requisitos de Acceso
+Página 43
+SharpAPI — Documentación Completa
+El  streaming  requiere  un  add-on  ($99/mes)  para  niveles  Hobby,  Pro  o  Sharp,  proporcionando  10  streams  concurrentes.
+Enterprise incluye límites personalizados.
+Soporte de Implementación
+Existen  SDKs  oficiales  para  TypeScript  y  Python,  con  ejemplos  de  código  proporcionados  para  navegadores  y  entornos
+Node.js.
+CONCEPTOS PRINCIPALES
+FORMATOS DE CUOTAS
+SharpAPI  entrega  cuotas  en  tres  representaciones  complementarias:  Americano,  Decimal  y  Probabilidad  Implícita,  todas
+incluidas en un solo objeto de respuesta.
+Cuotas Americanas
+Este  formato  estándar  de  EE.UU.  indica  "cuánto  ganas  o  debes  arriesgar."  Los  números  negativos  muestran  el  riesgo
+requerido para ganancia de $100; los números positivos muestran ganancia de una apuesta de $100.
+Ejemplos:
+•  -110: Arriesgar $110 para ganar $100 ($90.91 de ganancia)
+•  +150: Arriesgar $100 para ganar $150
+•  -200: Arriesgar $200 para ganar $100
+•  +200: Arriesgar $100 para ganar $200
+Cuotas Decimales
+"Estándar en Europa/Australia," este formato muestra retorno total por unidad apostada, incluyendo la apuesta original.
+Ejemplos:
+•  1.909: $190.90 de retorno total ($90.90 de ganancia)
+•  2.50: $250 de retorno total ($150 de ganancia)
+•  1.50: $150 de retorno total ($50 de ganancia)
+Probabilidad Implícita
+Calculada como "1 / Cuotas Decimales," esto representa la probabilidad de resultado evaluada por el mercado. Un decimal de
+2.00 equivale al 50%; 1.50 equivale al 66.7%; 3.00 equivale al 33.3%.
+Advertencia importante: La documentación advierte que "la probabilidad implícita incluye el margen de la casa de apuestas
+(vig)," siendo la probabilidad verdadera típicamente 2-5% más baja.
+La Vig/Juice
+Las casas de apuestas incrustan márgenes de ganancia en las cuotas. Un lanzamiento de moneda justo mostraría 2.00 en
+ambos  lados  (100%  de  probabilidad  total),  pero  con  vig,  ambos  lados  muestran  1.91  (104.8%  de  probabilidad  total),
+proporcionando la ventaja de la casa.
+Funciones de Conversión
+Página 44
+SharpAPI — Documentación Completa
+Americano a Decimal:
+•  Positivo: 1 + (Americano / 100)
+•  Negativo: 1 + (100 / |Americano|)
+Decimal a Americano:
+•  Si ≥2.0: (Decimal - 1) × 100
+•  Si <2.0: -100 / (Decimal - 1)
+Decimal a Probabilidad: 1 / Decimal
+CÁLCULO DE VALOR ESPERADO
+¿Qué es Valor Esperado?
+El Valor Esperado cuantifica ganancia o pérdida promedio por apuesta durante el tiempo. La fórmula fundamental es:
+"EV = (Probabilidad de Ganar × Ganancia) - (Probabilidad de Perder × Apuesta)"
+EV Positivo (+EV) indica rentabilidad a largo plazo.
+Ejemplo Práctico
+Para un lanzamiento de moneda a cuotas +110:
+•  Probabilidad de ganar: 50%
+•  Pago de ganancia: $110
+•  Cantidad de pérdida: $100
+•  Cálculo: (0.50 × $110) - (0.50 × $100) = +$5 por cada $100 (5% EV)
+Esto significa que esperas ganar $5 por cada $100 apostado consistentemente.
+Metodología de SharpAPI
+SharpAPI emplea Pinnacle (una casa de apuestas nítida) como el punto de referencia para probabilidad "justa". El proceso de
+tres pasos:
+1. Extraer Cuotas de Libro Nítido
+Ejemplo: Pinnacle muestra Equipo A a -115, Equipo B a +105
+2. Remover la Vigorisma
+Convertir probabilidades implícitas eliminando la ventaja de la casa (vig) para determinar cuotas justas
+3. Comparar Contra Libros Suaves
+Calcular EV comparando probabilidad justa contra precios de casa de apuestas más suaves
+Fórmula de EV
+"EV% = (fairprobability × decimalodds - 1) × 100"
+Clasificación de Mercado
+Rango de EV
+Evaluación
+Recomendación
+Por debajo de 0%
+No Rentable
+Evitar
+0-2%
+Marginal
+Solo volumen alto
+Página 45
+SharpAPI — Documentación Completa
+2-5%
+Calidad
+Juego estándar
+5%+
+Premium
+Alta confianza
+Umbral por defecto: 2% EV
+Advertencia Crítica
+EV  positivo  asegura  expectativa  matemática  pero  no  resultados  de  apuesta  individual.  Una  apuesta  de  +5%  EV  en  100
+apuestas podría resultar en cualquier lugar de -$2,000 a +$3,000 debido a varianza, aunque los resultados se estabilizan
+hacia +$5,000 en 1,000 apuestas.
+ARBITRAGE
+¿Qué es Arbitrage?
+El arbitrage ("arb") es una estrategia que explota diferencias de precios entre casas de apuestas para garantizar ganancias
+sin importar el resultado del evento.
+Concepto Fundamental
+"Arbitrage explota diferencias de precio entre casas de apuestas para garantizar ganancia independientemente del resultado."
+La esencia radica en que cuando la suma de probabilidades implícitas de todas las opciones es menor al 100%, existe una
+oportunidad de ganancia sin riesgo.
+Ejemplo Práctico: Mercado de Dos Resultados
+En un enfrentamiento Lakers vs Warriors:
+Casa
+Selección
+Cuota
+Prob. Implícita
+DraftKings
+Lakers
++145
+40.8%
+Pinnacle
+Warriors
+-135
+57.4%
+Total
+98.2%
+Con un total de 98.2% (menos del 100%), existe arbitrage con ganancia del 1.83%.
+Cálculo de Apuestas Óptimas
+Para garantizar retorno igual en cualquier resultado, distribuyes el capital proporcionalmente:
+•  Apuesta Lakers: $415 (41.5% del total)
+•  Apuesta Warriors: $585 (58.5% del total)
+Ambas opciones generan aproximadamente $1,017-$1,018 de retorno garantizado.
+Mercados de Tres Resultados
+En fútbol y hockey con empate:
+•  Equipo A: +200 (33.3%)
+•  Empate: +250 (28.6%)
+•  Equipo B: +180 (35.7%)
+•  Total: 97.6% → 2.4% de arbitrage
+Página 46
+SharpAPI — Documentación Completa
+Por Qué Existen Arbitrages
+1.  Diferencias temporales: Los libros actualizan a velocidades distintas
+2.  Diferencias de opinión: Modelos de riesgo variados
+3.  Promociones: Cuotas aumentadas artificialmente
+4.  Errores: Ocasionalmente cometen equivocaciones
+Desafíos en la Búsqueda de Arbitrages
+Las casas de apuestas desaprueban esta práctica:
+•  Cuentas limitadas o cerradas
+•  Retiros demorados
+•  Restricción a apuestas pequeñas
+Estrategias de Discreción
+•  Redondear montos de apuestas ($50 en lugar de $47.32)
+•  Mezclar con apuestas recreativas
+•  Retiros graduales
+•  Utilizar múltiples cuentas (donde sea legal)
+Arbitrage vs. Apuestas +EV
+Aspecto
+Arbitrage
+Apuestas +EV
+Riesgo
+Cero (garantizado)
+Existe varianza
+Ganancia típica
+1-3%
+2-10%
+Riesgo de cuenta
+Alto
+Menor
+Capital requerido
+Elevado
+Menor
+Viabilidad
+Limitada
+A largo plazo
+Características de SharpAPI para Arbitrage
+•  Detección en tiempo real (alertas sub-segundo)
+•  Cálculo de porcentajes de apuestas óptimos
+•  Cobertura de 6+ casas de apuestas
+•  Filtrado por ganancia mínima
+Conclusión
+"Muchos apostadores nítidos prefieren +EV sobre arb porque las cuentas duran más tiempo." Aunque el arbitrage garantiza
+ganancias,  las  apuestas  con  valor  esperado  positivo  ofrecen  mayor  sostenibilidad  a  largo  plazo,  permitiendo  aprovechar
+ventajas mayores sin riesgo de limitaciones.
+COINCIDENCIA DE EVENTOS
+Problema Principal y Solución
+SharpAPI  aborda  un  desafío  fundamental:  cada  casa  de  apuestas  usa  diferentes  IDs  de  evento  internos  para  juegos
+idénticos. Su solución es un ID de evento canónico que permanece consistente en todos los libros.
+Página 47
+SharpAPI — Documentación Completa
+El formato sigue este patrón: "{league}{teamA}{teamB}_{YYYY-MM-DD}"
+Ejemplo en plataformas:
+•  DraftKings: "33483200"
+•  FanDuel: "nba-bos-lal-20260208"
+•  Pinnacle: "556677889"
+•  Todos mapean a: "nbacelticslakers_20260208"
+Sistema de ID Dual
+Cada evento contiene dos tipos de identificador:
+1.  ID Canónico ("id"): "Identificador entre libros sirviendo como tu clave de base de datos principal"
+2.  IDs Externos ("external_ids"): Mapeo del identificador de evento nativo de cada casa de apuestas
+Proceso de Generación de ID
+El ID canónico combina cuatro elementos:
+•  Código de liga (basketball se convierte en "nba")
+•  Nombres de equipo normalizados (despojados de prefijos, sufijos, puntuación)
+•  Equipos ordenados alfabéticamente (asegura consistencia independientemente de designación casa/visitante)
+•  Fecha de inicio (formato YYYY-MM-DD)
+La  normalización  de  equipo  maneja  variaciones  como  "Los  Angeles  Lakers,"  "LA  Lakers"  y  "LAL"  todas  reduciéndose  a
+"lakers".
+Aplicaciones Prácticas
+Almacenamiento de base de datos: Usar el ID canónico como tu clave principal para eventos en todas las casas de apuestas
+Comparación entre libros: Consultar cuotas para un evento canónico específico para comparar precios simultáneamente
+Deep linking: Referenciar "external_ids" para dirigir usuarios a páginas de evento específicas de la casa de apuestas
+Detección de oportunidad: El mismo sistema de coincidencia impulsa los motores de detección de EV, arbitrage y middles de
+la plataforma internamente
+CUOTAS EN VIVO VS PREMATCH
+Definiciones Clave
+Cuotas  Prematch:  Establecidas  antes  de  que  los  juegos  comiencen,  contando  con  profundidad  de  mercado  integral,
+actualizaciones  medidas  y  participación  universal  de  libros.  Esto  representa  la  mayoría  de  cuotas  del  API  en  cualquier
+momento.
+Cuotas  en  Vivo  (In-Play):  Activas  durante  el  juego,  reflejando  probabilidades  en  tiempo  real  mientras  el  estado  del  juego
+evoluciona. Se filtran vía parámetro de consulta "live=true" con campo booleano indicador "is_live".
+Mecanismos de Entrega y Latencia
+La diferencia fundamental entre tipos de libro proviene de cómo transmiten cuotas:
+Tipo de Libro
+Método
+Latencia Mediana
+Percentil 95
+Página 48
+SharpAPI — Documentación Completa
+Pinnacle
+Push MQTT
+~0.8 segundos
+3.8-4.2 segundos
+FanDuel
+Polling HTTP
+~2.7 segundos
+~5.9 segundos
+DraftKings
+Polling HTTP
+~8 segundos
+~21 segundos
+El modelo push de Pinnacle entrega precios conforme el libro los transmite, mientras que competidores minoristas buscan
+datos en calendarios, introduciendo demoras inherentes.
+Libros Nítidos vs Libros Minoristas de EE.UU.
+Libros Nítidos (Pinnacle, Circa, Bookmaker)
+•  Raramente suspenden mercados durante juego
+•  Ofrecen 20-50+ mercados en vivo por evento
+•  Entrega basada en push rápida bajo 1 segundo mediano
+•  Sirven como "precio de referencia nítido" para cálculos de valor
+•  Requieren: Nivel Sharp o superior
+Libros Minoristas de EE.UU. (DraftKings, FanDuel, BetMGM, Caesars)
+•  Frecuentemente suspenden durante jugadas y revisiones de puntuación
+•  Menús limitados de mercado en vivo (3-10 opciones)
+•  Ventanas nulas regulares donde los precios desaparecen
+•  Los mercados típicamente se reabren dentro de 30-90 segundos
+•  Limitación práctica: Los precios faltantes no indican indisponibilidad permanente
+Estrategias Prácticas de Implementación
++EV/Arbitrage en Vivo: Requiere nivel Sharp; usar Pinnacle como referencia con patrón de diseño "manejar gracefully precios
+nulos de libros suaves".
+Visualización  de  Dashboard  en  Vivo:  Nivel  Pro  viable;  implementar  timestamps  "última  actualización"  y  estados  "mercado
+suspendido"; esperar brechas de datos frecuentes.
+Enfoque Prematch: Nivel Gratuito suficiente con parámetro explícito "?live=false"; la frecuencia de actualización es adecuada
+para este tipo de mercado.
+Notas de Acceso Crítico
+Solicitar datos de libro nítido en niveles Gratuito/Hobby/Pro devuelve un error "403 tier_restricted". Los límites de tasa de nivel
+Gratuito (12 solicitudes por 60 segundos) inherentemente previenen estrategias de apuestas en vivo independientemente de
+selección de libro.
+ODDSCHANGEDAT DE PINNACLE
+Concepto Principal
+El campo "oddschangedat" de Pinnacle representa "el timestamp del escritorio de trading de Pinnacle — cuándo Pinnacle
+reprecio por última vez esta línea específica." No es un timestamp del pipeline de SharpAPI.
+Distinción Clave
+Página 49
+SharpAPI — Documentación Completa
+La documentación clarifica dos campos separados:
+•  "oddschangedat": Cuándo el escritorio de trading de Pinnacle movió la línea
+•  "lastseenat": Cuándo el pipeline de SharpAPI observó por última vez la fila
+Como se explica: "Una brecha grande entre los dos (últimavista "lastseenat" fresca, antiguo "oddschanged_at") significa que
+Pinnacle está manteniendo la línea fija."
+Por Qué las Líneas Aparecen Obsoletas
+Pinnacle opera como un market-maker que reprecio solo cuando el flujo de trading actual necesita ajuste. Las tasas de datos
+observadas para precios nuevos varían significativamente:
+•  Soccer: ~94% tasa de datos nuevos
+•  Tennis: ~66%
+•  NHL: ~51%
+•  MLB: ~18%
+•  NBA: ~9%
+Para mercados NBA y MLB especialmente, ventanas ociosas de 30+ minutos son comunes porque el escritorio de Pinnacle
+simplemente no está moviendo precios.
+Orientación Práctica
+Monitorea "lastseenat" para frescura de pipeline. Si este timestamp es reciente pero "oddschangedat" es antiguo, Pinnacle
+está  deliberadamente  manteniendo  líneas  fijas—esto  es  comportamiento  normal  del  market-maker,  no  un  problema  de
+sistema.
+Esta es la documentación completa de SharpAPI compilada de todas las páginas del sitio oficial.
+Página 50

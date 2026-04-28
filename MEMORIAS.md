@@ -1,7 +1,7 @@
 # Memorias del Proyecto
 
 > Este archivo se mantiene sincronizado con las memorias internas de Cascade.
-> Última actualización: 2026-04-27 (optimización API, auto-liquidación, freshness tracking)
+> Última actualización: 2026-04-27 21:20 (nuevos scrapers: Kambi + Bet365)
 
 ---
 
@@ -321,16 +321,38 @@ El scraper produce exactamente el mismo formato que `OddsClient`:
 - **`NOTAS_DEV.md`**: escribe SOLO la PC corporativa (cambios de código, qué probar)
 - Elimina necesidad de copiar/pegar resultados por email entre PCs
 
+### Kambi Scraper ✅ (2026-04-27 21:20)
+- **Archivo**: `scraping/kambi_scraper.py`
+- **API**: `eu-offering.kambicdn.org/offering/v2018/{operator}/...`
+- **NO requiere Playwright** — HTTP puro, ~2 segundos
+- **3 casas**: 888sport (op "888"), Unibet (op "ub"), BetSafe (op "betsafe")
+- **BetSafe = grupo Betsson** → cubre casa prioritaria
+- **Mercados**: h2h (cat 12579), totals (cat 12580), spreads (cat 12218)
+- **Autodescubre ligas** desde `group.json`
+- **Nota**: 888sport podría haber migrado fuera de Kambi
+
+### Bet365 Scraper (2026-04-27 21:20) — POR TESTEAR
+- **Archivo**: `scraping/bet365_scraper.py`
+- **Motor**: Playwright + intercepción API
+- **Formatos soportados**: JSON moderno + pipe-delimited XOR (legacy)
+- **Múltiples TLDs**: bet365.com, bet365.cr, bet365.com.au
+- **Riesgo**: Puede requerir captcha o estar geobloqueado
+
+### DoradoBet — DESCARTADO ❌
+- Plataforma Altenar, pocas ligas europeas
+- No vale la pena mantener
+
 ### Archivos nuevos del módulo scraping
 | Archivo | Función |
-|---------|---------|
-| `scraping/onexbet_scraper.py` | Scraper 1xBet interceptando API interna |
+|---------|---------||
+| `scraping/onexbet_scraper.py` | Scraper 1xBet/MelBet/20Bet (BetB2B engine) |
+| `scraping/kambi_scraper.py` | Scraper 888sport/Unibet/BetSafe (Kambi CDN, HTTP puro) |
+| `scraping/bet365_scraper.py` | Scraper Bet365 (Playwright + XOR decode) |
 | `scraping/event_matcher.py` | Fuzzy matching entre Pinnacle y soft books |
 | `scraping/scanner_v2.py` | Pipeline completo: scrape → match → EV calc |
 | `scraping/test_1xbet_deep.py` | Diagnóstico de estructura API 1xBet |
 
 ---
-
 ## Flujo de trabajo (2026-04-27)
 
 - **Repo GitHub**: https://github.com/gcerdas16/paradigmasportsbetting.git
@@ -345,17 +367,19 @@ El scraper produce exactamente el mismo formato que `OddsClient`:
 
 | Sitio | Estado |
 |-------|--------|
-| **Pinnacle** (quick) | ✅ 77 partidos, 2252 markets |
-| **Pinnacle** (completo) | ✅ Champions, Europa League, Serie A, etc. |
-| **1xBet** | ✅ API interna interceptada |
-| **888sport** | ✅ Accesible |
-| **DraftKings** | ✅ Accesible |
-| **bet365** | ✅ Accesible (¡NO disponible en The Odds API!) |
-| **WilliamHill** | ✅ Accesible |
-| **Unibet** | ✅ Accesible |
-| **BetMGM** | ✅ Accesible |
-| **Betway** | ⚠️ Cargó sin título |
-| **FanDuel** | ⚠️ Bloqueado (plataforma US-only) |
+| **Pinnacle** (sharp) | ✅ 77 partidos, 2252 markets | pinnacle_scraper.py |
+| **1xBet** | ✅ 155 eventos con odds | onexbet_scraper.py |
+| **MelBet** | ✅ Mismo engine que 1xBet | onexbet_scraper.py |
+| **20Bet** | ✅ Mismo engine que 1xBet | onexbet_scraper.py |
+| **888sport** | 🔴 Por testear (Kambi) | kambi_scraper.py |
+| **Unibet** | 🔴 Por testear (Kambi) | kambi_scraper.py |
+| **BetSafe** (Betsson) | 🔴 Por testear (Kambi) | kambi_scraper.py |
+| **Bet365** | 🔴 Por testear (Playwright) | bet365_scraper.py |
+| **DraftKings** | ✅ Accesible (sin scraper aún) | — |
+| **WilliamHill** | ✅ Accesible (sin scraper aún) | — |
+| **BetMGM** | ✅ Accesible (sin scraper aún) | — |
+| **Betway** | ⚠️ Cargó sin título | — |
+| **FanDuel** | ⚠️ Bloqueado (US-only) | — |
 
 ### Hallazgos clave
 - **1xBet API interceptable** → podemos construir scraper igual que Pinnacle

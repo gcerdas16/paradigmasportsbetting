@@ -23,6 +23,12 @@
 |---|---|
 | Pinnacle scraper | ✅ Funcionando (115 eventos) |
 | 1xBet scraper | ✅ Funcionando (155 eventos) |
+| MelBet scraper | ✅ Mismo engine que 1xBet |
+| 20Bet scraper | ✅ Mismo engine que 1xBet |
+| 888sport scraper (Kambi) | 🔴 NUEVO — Por testear |
+| Unibet scraper (Kambi) | 🔴 NUEVO — Por testear |
+| BetSafe scraper (Kambi/Betsson) | 🔴 NUEVO — Por testear |
+| Bet365 scraper | 🔴 NUEVO — Por testear |
 | Event matcher | ✅ Limpio (94 emparejados, Bookings excluidos) |
 | EV calc — h2h | ✅ Funcionando (7 near misses detectados) |
 | EV calc — totals | ✅ Funcionando (1 near miss, 750 matched) |
@@ -32,7 +38,75 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 18:35 — Buscar URLs de ligas europeas en DoradoBet
+### 🔴 2026-04-27 21:20 — 4 scrapers nuevos: Kambi (888sport, Unibet, BetSafe) + Bet365
+
+**Qué cambió:**
+1. **Nuevo: `scraping/kambi_scraper.py`** — Scraper para casas Kambi via API REST pública
+   - **NO usa Playwright** — solo HTTP requests a `eu-offering.kambicdn.org`
+   - 3 casas: `888sport` (op "888"), `unibet` (op "ub"), `betsafe` (op "betsafe")
+   - BetSafe = grupo Betsson (cubre nuestra casa prioritaria)
+   - Mercados: h2h (1X2), totals (O/U), spreads (handicap)
+   - Autodescubre ligas desde `group.json`
+   - ~2 segundos vs ~2 minutos de los scrapers Playwright
+2. **Nuevo: `scraping/bet365_scraper.py`** — Scraper para Bet365 via Playwright
+   - Intercepta API interna (JSON moderno + pipe-delimited legacy)
+   - Incluye decodificador XOR para formato legacy
+   - Intenta múltiples URLs/TLDs (bet365.com, bet365.cr)
+   - ⚠️ Puede requerir interacción manual (captcha, geoblock)
+3. **scanner_v2.py** — Todas las casas nuevas integradas
+4. **DoradoBet eliminado** del pipeline (pocas ligas, no vale la pena)
+
+**Casas disponibles ahora:** `1xbet`, `melbet`, `20bet`, `888sport`, `unibet`, `betsafe`, `bet365`
+
+**Comandos de test — PARTE 1: Kambi (rápido, sin Playwright):**
+
+```bash
+cd paradigma
+
+# Probar cada casa Kambi individualmente
+python -m scraping.kambi_scraper --book 888sport
+python -m scraping.kambi_scraper --book unibet
+python -m scraping.kambi_scraper --book betsafe
+```
+
+**Comandos de test — PARTE 2: Bet365 (Playwright):**
+
+```bash
+# Con browser VISIBLE (recomendado para primer test — puede pedir captcha)
+python -m scraping.bet365_scraper --no-headless
+
+# Si funciona sin captcha, probar headless:
+python -m scraping.bet365_scraper
+```
+
+**Comandos de test — PARTE 3: Scanner combinado:**
+
+```bash
+# Solo Kambi (rápido, ~5 seg):
+python -m scraping.scanner_v2 --books 888sport,unibet,betsafe
+
+# 1xBet + Kambi (lo más probable que funcione):
+python -m scraping.scanner_v2 --books 1xbet,888sport,unibet,betsafe
+
+# ALL-IN (7 casas):
+python -m scraping.scanner_v2 --books 1xbet,melbet,20bet,888sport,unibet,betsafe,bet365
+```
+
+**Qué buscar:**
+1. **Kambi:** ¿Descubre competiciones? ¿Cuántos eventos? Si HTTP 403 → reportar
+2. **Bet365:** ¿Carga la página? ¿Captura JSON o pipe? Si captcha → reportar screenshot
+3. **BetSafe:** ¿Funciona como Betsson? (es del mismo grupo)
+4. **Scanner:** ¿Más value bets con 7 casas vs 3?
+5. **888sport:** Podría haber migrado fuera de Kambi → si falla, normal
+
+**⚠️ NOTA:** Kambi NO requiere Playwright, debería funcionar desde cualquier PC.
+Bet365 SÍ requiere Playwright y acceso al sitio.
+
+**Pegar en RESULTADOS_TEST.md:** Output de cada scraper individual + output del scanner combinado.
+
+---
+
+### ✅ 2026-04-27 18:35 — Buscar URLs de ligas europeas en DoradoBet (DESCARTADO)
 
 **NO es código, es manual en el navegador.**
 

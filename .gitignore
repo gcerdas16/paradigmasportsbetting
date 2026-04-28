@@ -12,8 +12,9 @@ scraping_debug/
 diagnostico_data/
 *.log
 
-# PDF generados
+# PDF generados (excepto documentación)
 *.pdf
+!SharpAPI_Documentacion.pdf
 
 # OS
 .DS_Store
