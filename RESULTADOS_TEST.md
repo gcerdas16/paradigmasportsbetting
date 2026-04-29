@@ -6,6 +6,33 @@
 
 ---
 
+## 🔴 PENDIENTE PARA DEV PC — BetSafe v11 (actualizado 2026-04-28)
+
+BetSafe usa `/en/sportsbook/football/` (inglés), NO `/es/apuestas-deportivas/futbol/`. URLs **confirmadas manualmente**:
+
+```python
+FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
+
+LEAGUE_URLS = [
+    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
+    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
+    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
+    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
+    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
+    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league",
+    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league",
+]
+```
+
+Cambios requeridos en `kambi_scraper.py`:
+1. `FOOTBALL_URL` → URL de arriba
+2. `LEAGUE_URLS` → lista de arriba (hardcodeada, no dinámica)
+3. Selector → `a[href*="/sportsbook/football/"]` (o simplemente usar LEAGUE_URLS sin búsqueda dinámica)
+
+**Test debe correrse entre 12:00-15:00 hora Costa Rica** (partidos europeos upcoming).
+
+---
+
 ## Cómo usar
 
 1. Hacer `git pull` para obtener los últimos cambios de código
