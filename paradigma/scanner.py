@@ -51,6 +51,18 @@ class ValueScanner:
             self.notifier.send_stop_loss(self.tracker.bankroll)
             return []
 
+        # Verificar exposición diaria ANTES de gastar API calls
+        if self.tracker.is_daily_limit_reached():
+            logger.info("Límite de exposición diaria alcanzado. Saltando escaneo de odds (ahorrando API calls).")
+            # Aún intentar liquidar apuestas pendientes
+            try:
+                settle_result = self.settler.settle_pending()
+                if settle_result.get("settled", 0) > 0:
+                    logger.info(f"Auto-liquidación: {settle_result}")
+            except Exception as e:
+                logger.warning(f"Error en auto-liquidación: {e}")
+            return []
+
         # 0. Scouting gratuito (no gasta quota)
         total_events_available = 0
         for sport in config.SPORTS:

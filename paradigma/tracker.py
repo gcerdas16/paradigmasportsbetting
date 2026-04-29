@@ -342,6 +342,16 @@ class Tracker:
         )
         return sum(b.stake for b in bets_today if b.stake)
 
+    def is_daily_limit_reached(self) -> bool:
+        """Verifica si la exposición diaria ya alcanzó el máximo."""
+        session = self.SessionLocal()
+        try:
+            daily_exposure = self._get_daily_exposure(session)
+            max_exposure = self.bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
+            return daily_exposure >= max_exposure
+        finally:
+            session.close()
+
     def check_stop_loss(self) -> bool:
         """
         Verifica si se activó el stop-loss semanal.
