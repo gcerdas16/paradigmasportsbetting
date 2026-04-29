@@ -38,18 +38,27 @@
 
 ## Entradas
 
-### 🔴 2026-04-28 20:30 — FIX v10: BetSafe URLs confirmadas por usuario (EPL, Bundesliga, Serie A, Ligue 1)
+### 🔴 2026-04-28 20:45 — FIX v10b: BetSafe cambio completo a inglés + URLs corregidas
 
-**URLs confirmadas por el usuario:**
-- EPL: `/es/apuestas-deportivas/futbol/inglaterra/inglaterra-premier-league`
+**Basado en test 20:34:** v10 dio 1 evento por HORARIO (02:36 UTC, sin partidos europeos). El código está bien, pero las URLs estaban mal.
+
+**URLs TODAS CONFIRMADAS manualmente por el usuario:**
+- EPL: `/en/sportsbook/football/england/england-premier-league`
 - La Liga: `/en/sportsbook/football/spain/spain-la-liga`
 - Bundesliga: `/en/sportsbook/football/germany/germany-bundesliga`
 - Serie A: `/en/sportsbook/football/italy/italy-serie-a`
+- Ligue 1: `/en/sportsbook/football/france/france-ligue-1`
+- UCL: `/en/sportsbook/football/champions-league/champions-league`
+- UEL: `/en/sportsbook/football/europa-league/europa-league`
 
-**Fix v10:**
-1. Fallback URLs actualizadas con las URLs reales confirmadas
-2. Link discovery ahora busca `/futbol/`, `/football/`, y `/sportsbook/football/`
-3. France Ligue 1 y UCL/UEL aún son guesses — se confirmará en el test
+**Fixes v10b:**
+1. `FOOTBALL_URL` → `/en/sportsbook/football?tab=liveAndUpcoming` (era `/es/apuestas-deportivas/futbol`)
+2. Selector primario → `a[href*="/sportsbook/football/"]` (era `/futbol/`)
+3. Todas las fallback URLs corregidas con los slugs confirmados
+4. UCL = `champions-league/champions-league` (no solo `champions-league`)
+5. UEL = `europa-league/europa-league`
+
+**⚠️ TESTEAR EN HORARIO CORRECTO: 12:00-17:00 hora CR** (cuando hay partidos europeos upcoming)
 
 **INSTRUCCIONES PARA TESTEAR:**
 
@@ -60,10 +69,9 @@ python -m scraping.kambi_scraper --book betsafe --no-headless
 ```
 
 **Qué buscar:**
-1. `"Total ligas a navegar: N"` — N debería ser ~8-11
-2. `"Navegando a liga: xxx"` — ¿aparece EPL, Bundesliga, Serie A, La Liga?
+1. `"Links: /sportsbook/=N"` — N > 0 confirma que el sitio carga en inglés
+2. `"Total ligas a navegar: N"` — N >= 7
 3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 60**
-4. Si alguna URL da error/timeout → reportar cuál (especialmente `france-ligue-1`, `champions-league`, `europa-league`)
 
 ---
 

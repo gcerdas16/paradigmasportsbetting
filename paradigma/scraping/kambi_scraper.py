@@ -327,7 +327,7 @@ class BetSafeScraper:
         → data.events, data.markets, data.marketSelections, data.scoreboards
     """
 
-    FOOTBALL_URL = "https://www.betsafe.com/es/apuestas-deportivas/futbol?tab=liveAndUpcoming"
+    FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
     API_PATH_PREFIX = "/api/sb/v1/"
 
     # Keywords para encontrar ligas europeas en links del sidebar
@@ -336,16 +336,15 @@ class BetSafeScraper:
         "bundesliga", "serie a", "ligue 1",
     ]
 
-    # Fallback: URLs confirmadas de ligas clave
-    # Patrón confirmado: /en/sportsbook/football/{country}/{country}-{league}
+    # Fallback: URLs CONFIRMADAS manualmente por el usuario
     FALLBACK_LEAGUE_URLS = [
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/inglaterra/inglaterra-premier-league",
+        "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
         "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
         "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
         "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
         "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
-        "https://www.betsafe.com/en/sportsbook/football/champions-league",
-        "https://www.betsafe.com/en/sportsbook/football/europa-league",
+        "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league",
+        "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league",
     ]
 
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
@@ -409,20 +408,19 @@ class BetSafeScraper:
 
             # Navegar a UN partido por liga → events-table/v2 carga la liga completa
             try:
-                links_es = page.query_selector_all('a[href*="/futbol/"]')
-                links_en = page.query_selector_all('a[href*="/football/"]')
                 links_sb = page.query_selector_all('a[href*="/sportsbook/football/"]')
-                all_links = links_es + links_en + links_sb
+                links_fb = page.query_selector_all('a[href*="/football/"]')
+                links_es = page.query_selector_all('a[href*="/futbol/"]')
+                all_raw = links_sb + links_fb + links_es
                 # Dedup by href
                 seen_hrefs = set()
-                unique_links = []
-                for lnk in all_links:
+                all_links = []
+                for lnk in all_raw:
                     h = lnk.get_attribute("href") or ""
-                    if h not in seen_hrefs:
+                    if h and h not in seen_hrefs:
                         seen_hrefs.add(h)
-                        unique_links.append(lnk)
-                all_links = unique_links
-                logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}, /sportsbook/={len(links_sb)}, unique={len(all_links)}")
+                        all_links.append(lnk)
+                logger.info(f"  Links: /sportsbook/={len(links_sb)}, /football/={len(links_fb)}, /futbol/={len(links_es)}, unique={len(all_links)}")
 
                 # Extraer URL de liga: quitar último segmento (partido) del match URL
                 # /futbol/champions-league/atletico-arsenal → /futbol/champions-league
