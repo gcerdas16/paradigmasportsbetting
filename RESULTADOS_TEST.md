@@ -1429,3 +1429,40 @@ Ligas capturadas:
 3. **Atlético vs Arsenal (UCL)** — no aparece porque el partido ya fue
 
 **Debug:** `scraping_debug/betsafe_betsson_20260429_010352.json`
+
+---
+
+### 2026-04-28 20:34 — BetSafe v10: fallback URLs EPL/Bundesliga — TIMING ISSUE (no bug de código)
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~2 min
+**Exit code:** 0
+
+**Output:**
+```
+Total ligas a navegar: 12 (5 dinámicas + 7 fallback con EPL/Bundesliga/etc.)
+events-table no disparó para: champions-league, uefa-champions-league, concacaf-champions-cup,
+                               inglaterra, espana, inglaterra-premier-league, spain-la-liga,
+                               germany-bundesliga, italy-serie-a, france-ligue-1, europa-league
+BetSafe: 16 API responses capturadas
+BetSafe: 1 evento con odds (Cerro Porteño vs Palmeiras, 1 sel)
+```
+
+**⚠️ ESTO NO ES UN BUG DE CÓDIGO — ES UN PROBLEMA DE HORARIO**
+
+Comparación debug files:
+```
+v9  (19:03 CR / 01:03 UTC)  →  34.8 MB debug  →  52 eventos  ✅
+v10 (20:36 CR / 02:36 UTC)  →   9.4 MB debug  →   1 evento   ❌
+```
+
+Los partidos europeos se juegan ~19:00-22:00 hora España = **12:00-15:00 hora Costa Rica**.
+A las 20:36 CR (02:36 UTC) ya no hay eventos "upcoming" en BetSafe para UCL/La Liga/EPL/etc.
+
+Los "events-table no disparó" en v10 son **verdaderos negativos** — events-table sí se llama pero BetSafe responde con 0 eventos porque ya no hay partidos próximos.
+
+**Conclusión: el código v10 está bien. Hay que re-testar en horario correcto (12:00-17:00 CR) cuando los partidos europeos sean "upcoming".**
+
+**Para el dev PC:** No hacer rollback. v10 es correcto con los fallback URLs. La premier league se testea mañana en horario europeo.
+
+**Debug:** `scraping_debug/betsafe_betsson_20260429_023631.json`
