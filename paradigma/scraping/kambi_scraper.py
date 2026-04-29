@@ -336,15 +336,16 @@ class BetSafeScraper:
         "bundesliga", "serie a", "ligue 1",
     ]
 
-    # Fallback: URLs confirmadas de ligas clave (patrón: /futbol/{país}/{país}-{liga})
+    # Fallback: URLs confirmadas de ligas clave
+    # Patrón confirmado: /en/sportsbook/football/{country}/{country}-{league}
     FALLBACK_LEAGUE_URLS = [
         "https://www.betsafe.com/es/apuestas-deportivas/futbol/inglaterra/inglaterra-premier-league",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/espana/espana-la-liga",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/alemania/alemania-bundesliga",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/italia/italia-serie-a",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/francia/francia-ligue-1",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/champions-league",
-        "https://www.betsafe.com/es/apuestas-deportivas/futbol/europa-league",
+        "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
+        "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
+        "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
+        "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
+        "https://www.betsafe.com/en/sportsbook/football/champions-league",
+        "https://www.betsafe.com/en/sportsbook/football/europa-league",
     ]
 
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
@@ -410,8 +411,18 @@ class BetSafeScraper:
             try:
                 links_es = page.query_selector_all('a[href*="/futbol/"]')
                 links_en = page.query_selector_all('a[href*="/football/"]')
-                all_links = links_es + links_en
-                logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}")
+                links_sb = page.query_selector_all('a[href*="/sportsbook/football/"]')
+                all_links = links_es + links_en + links_sb
+                # Dedup by href
+                seen_hrefs = set()
+                unique_links = []
+                for lnk in all_links:
+                    h = lnk.get_attribute("href") or ""
+                    if h not in seen_hrefs:
+                        seen_hrefs.add(h)
+                        unique_links.append(lnk)
+                all_links = unique_links
+                logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}, /sportsbook/={len(links_sb)}, unique={len(all_links)}")
 
                 # Extraer URL de liga: quitar último segmento (partido) del match URL
                 # /futbol/champions-league/atletico-arsenal → /futbol/champions-league

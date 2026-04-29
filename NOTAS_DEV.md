@@ -38,18 +38,18 @@
 
 ## Entradas
 
-### 🔴 2026-04-28 20:27 — FIX v10: BetSafe fallback URLs confirmadas (EPL, Bundesliga, Serie A, Ligue 1)
+### 🔴 2026-04-28 20:30 — FIX v10: BetSafe URLs confirmadas por usuario (EPL, Bundesliga, Serie A, Ligue 1)
 
-**Basado en test 19:02:** v9 logró 52 eventos ✅ pero falta Premier League. URL confirmada por el usuario: `/futbol/inglaterra/inglaterra-premier-league`
+**URLs confirmadas por el usuario:**
+- EPL: `/es/apuestas-deportivas/futbol/inglaterra/inglaterra-premier-league`
+- La Liga: `/en/sportsbook/football/spain/spain-la-liga`
+- Bundesliga: `/en/sportsbook/football/germany/germany-bundesliga`
+- Serie A: `/en/sportsbook/football/italy/italy-serie-a`
 
-**Fix v10:** Patrón descubierto: `/futbol/{país}/{país}-{liga}`. Agregadas 7 URLs hardcodeadas como **fallback** (se agregan después del discovery dinámico, sin duplicar):
-- `inglaterra/inglaterra-premier-league`
-- `espana/espana-la-liga`
-- `alemania/alemania-bundesliga`
-- `italia/italia-serie-a`
-- `francia/francia-ligue-1`
-- `champions-league`
-- `europa-league`
+**Fix v10:**
+1. Fallback URLs actualizadas con las URLs reales confirmadas
+2. Link discovery ahora busca `/futbol/`, `/football/`, y `/sportsbook/football/`
+3. France Ligue 1 y UCL/UEL aún son guesses — se confirmará en el test
 
 **INSTRUCCIONES PARA TESTEAR:**
 
@@ -60,10 +60,10 @@ python -m scraping.kambi_scraper --book betsafe --no-headless
 ```
 
 **Qué buscar:**
-1. `"Total ligas a navegar: N"` — N debería ser ~8-11 (dinámicas + fallback sin duplicados)
-2. `"Navegando a liga: inglaterra-premier-league"` — ¿aparece?
-3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 60** (52 + EPL + Bundesliga + Serie A + Ligue 1)
-4. Si alguna URL da error/timeout → reportar cuál
+1. `"Total ligas a navegar: N"` — N debería ser ~8-11
+2. `"Navegando a liga: xxx"` — ¿aparece EPL, Bundesliga, Serie A, La Liga?
+3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 60**
+4. Si alguna URL da error/timeout → reportar cuál (especialmente `france-ligue-1`, `champions-league`, `europa-league`)
 
 ---
 
