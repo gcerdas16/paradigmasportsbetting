@@ -160,16 +160,30 @@ class Tracker:
             current_bankroll = self.bankroll
             stake = current_bankroll * (vb.kelly_stake_percent / 100.0)
 
-            # Verificar exposición diaria
+            # Verificar exposición diaria (solo apuestas creadas HOY)
             daily_exposure = self._get_daily_exposure(session)
-            max_exposure = current_bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
+            max_daily = current_bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
 
-            if daily_exposure + stake > max_exposure:
+            if daily_exposure + stake > max_daily:
                 logger.warning(
-                    f"Exposición diaria excedida. "
-                    f"Actual: ${daily_exposure:.2f}, "
+                    f"Límite diario excedido. "
+                    f"Hoy: ${daily_exposure:.2f}, "
                     f"Stake: ${stake:.2f}, "
-                    f"Máx: ${max_exposure:.2f}. "
+                    f"Máx diario: ${max_daily:.2f}. "
+                    f"Apuesta OMITIDA."
+                )
+                return None
+
+            # Verificar exposición total (todas las apuestas abiertas)
+            total_exposure = self._get_total_exposure(session)
+            max_total = current_bankroll * (config.MAX_TOTAL_EXPOSURE / 100.0)
+
+            if total_exposure + stake > max_total:
+                logger.warning(
+                    f"Tope total excedido. "
+                    f"Abierto: ${total_exposure:.2f}, "
+                    f"Stake: ${stake:.2f}, "
+                    f"Máx total: ${max_total:.2f}. "
                     f"Apuesta OMITIDA."
                 )
                 return None
@@ -333,22 +347,41 @@ class Tracker:
             session.close()
 
     def _get_daily_exposure(self, session) -> float:
-        """Calcula la exposición total del día actual."""
+        """Calcula cuánto se apostó HOY (por fecha de creación)."""
         today = datetime.now(timezone.utc).date()
         bets_today = (
             session.query(Bet)
-            .filter(Bet.result.is_(None))
+            .filter(Bet.created_at >= datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc))
             .all()
         )
         return sum(b.stake for b in bets_today if b.stake)
 
+    def _get_total_exposure(self, session) -> float:
+        """Calcula el total abierto (todas las apuestas sin resultado)."""
+        pending = (
+            session.query(Bet)
+            .filter(Bet.result.is_(None))
+            .all()
+        )
+        return sum(b.stake for b in pending if b.stake)
+
     def is_daily_limit_reached(self) -> bool:
-        """Verifica si la exposición diaria ya alcanzó el máximo."""
-        session = self.SessionLocal()
+        """Verifica si el límite diario ya se alcanzó."""
+        session = self.Session()
         try:
             daily_exposure = self._get_daily_exposure(session)
-            max_exposure = self.bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
-            return daily_exposure >= max_exposure
+            max_daily = self.bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
+            return daily_exposure >= max_daily
+        finally:
+            session.close()
+
+    def is_total_limit_reached(self) -> bool:
+        """Verifica si el tope total de exposición ya se alcanzó."""
+        session = self.Session()
+        try:
+            total_exposure = self._get_total_exposure(session)
+            max_total = self.bankroll * (config.MAX_TOTAL_EXPOSURE / 100.0)
+            return total_exposure >= max_total
         finally:
             session.close()
 

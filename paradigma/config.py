@@ -72,7 +72,8 @@ PINNACLE_BOOK_KEY = "pinnacle"
 MIN_EV_PERCENT = 5.0            # Solo apostar si EV > 5%
 KELLY_FRACTION = 0.25           # Kelly ÷4 (conservador)
 MAX_KELLY_PERCENT = 2.0         # Cap máximo 2% del bankroll por apuesta
-MAX_DAILY_EXPOSURE = 10.0       # Máximo 10% del bankroll en juego simultáneo
+MAX_DAILY_EXPOSURE = 10.0       # Máximo 10% del bankroll apostado por día
+MAX_TOTAL_EXPOSURE = 30.0       # Máximo 30% del bankroll abierto al mismo tiempo
 STOP_LOSS_WEEKLY_PERCENT = 15.0 # Pausar si bankroll baja 15% en una semana
 
 # Bankroll inicial (paper trading)

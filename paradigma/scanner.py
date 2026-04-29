@@ -51,10 +51,14 @@ class ValueScanner:
             self.notifier.send_stop_loss(self.tracker.bankroll)
             return []
 
-        # Verificar exposición diaria ANTES de gastar API calls
-        if self.tracker.is_daily_limit_reached():
-            logger.info("Límite de exposición diaria alcanzado. Saltando escaneo de odds (ahorrando API calls).")
-            # Aún intentar liquidar apuestas pendientes
+        # Verificar límites ANTES de gastar API calls
+        daily_full = self.tracker.is_daily_limit_reached()
+        total_full = self.tracker.is_total_limit_reached()
+
+        if daily_full or total_full:
+            reason = "diario" if daily_full else "total"
+            logger.info(f"Límite {reason} alcanzado. Saltando escaneo de odds (ahorrando API calls).")
+            # Aún intentar liquidar apuestas pendientes (libera espacio)
             try:
                 settle_result = self.settler.settle_pending()
                 if settle_result.get("settled", 0) > 0:
