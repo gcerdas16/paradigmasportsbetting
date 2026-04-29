@@ -6,7 +6,7 @@
 
 ---
 
-## 🔴 PENDIENTE PARA DEV PC — BetSafe v11 (actualizado 2026-04-28)
+## 🔴 INSTRUCCIONES PARA DEV PC — BetSafe v11 (actualizado 2026-04-28 21:00 CR)
 
 BetSafe usa `/en/sportsbook/football/` (inglés), NO `/es/apuestas-deportivas/futbol/`. URLs **confirmadas manualmente**:
 
@@ -24,20 +24,55 @@ LEAGUE_URLS = [
 ]
 ```
 
-Cambios requeridos en `kambi_scraper.py`:
-1. `FOOTBALL_URL` → URL de arriba
-2. `LEAGUE_URLS` → lista de arriba (hardcodeada, no dinámica)
-3. Selector → `a[href*="/sportsbook/football/"]` (o simplemente usar LEAGUE_URLS sin búsqueda dinámica)
+**Cambios exactos requeridos en `kambi_scraper.py` — clase `BetSafeScraper`:**
 
-**Test debe correrse entre 12:00-15:00 hora Costa Rica** (partidos europeos upcoming).
+**Fix 1 — FOOTBALL_URL y LEAGUE_URLS (hardcodeadas, sin discovery dinámico):**
+```python
+FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
 
-⚠️ **Bug detectado en fallback URLs:** el scraper navega a `england-premier-league` en vez de `england/england-premier-league` — le falta el segmento de país. Verificar que el full_url se construye como `https://www.betsafe.com/en/sportsbook/football/england/england-premier-league` (2 segmentos tras `/football/`).
+LEAGUE_URLS = [
+    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
+    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
+    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
+    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
+    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
+    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league",
+    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league",
+]
+```
 
-⚠️ **Bug crítico — Playwright se queda en negro en las páginas de liga:**
-- URL `https://www.betsafe.com/en/sportsbook/football/england/england-premier-league` carga perfectamente en browser normal (hay partidos EPL: Leeds, Newcastle vs Brighton, sábado 3 mayo)
-- Pero cuando Playwright navega a esa URL → pantalla negra, nunca carga, `networkidle` nunca dispara
-- Causa probable: `wait_until="networkidle"` falla porque la página hace polling continuo de live scores, O BetSafe detecta Playwright como bot en páginas de liga específicas
-- Fix recomendado: cambiar `wait_until="networkidle"` por `wait_until="domcontentloaded"` + `page.wait_for_timeout(5000)` para las navegaciones de liga
+**Fix 2 — Navegación de ligas: cambiar `networkidle` por `domcontentloaded`:**
+```python
+# ANTES (se queda en negro / nunca termina en páginas de liga):
+page.goto(league_url, wait_until="networkidle", timeout=self.timeout_ms)
+
+# DESPUÉS:
+page.goto(league_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+page.wait_for_timeout(5_000)  # dar tiempo a events-table para disparar
+```
+
+**Fix 3 — Eliminar el link discovery dinámico** (estaba extrayendo slugs incorrectos).
+Reemplazar todo el bloque de `query_selector_all` por un simple loop sobre `LEAGUE_URLS`:
+```python
+for league_url in self.LEAGUE_URLS:
+    try:
+        slug = league_url.split("/")[-1]
+        logger.info(f"  Navegando a liga: {slug}")
+        page.goto(league_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+        page.wait_for_timeout(5_000)
+        for _ in range(3):
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(1_500)
+    except Exception as e:
+        logger.warning(f"  Error en liga {slug}: {e}")
+        continue
+```
+
+**Resumen de bugs confirmados:**
+- ✅ URLs confirmadas manualmente por usuario — son correctas
+- ❌ `networkidle` en páginas de liga → pantalla negra, nunca termina
+- ❌ Link discovery dinámico → extrae slugs incompletos (falta segmento de país)
+- ✅ `domcontentloaded` debería funcionar — events-table dispara apenas carga el DOM
 
 ---
 
