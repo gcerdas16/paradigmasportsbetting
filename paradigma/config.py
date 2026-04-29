@@ -24,15 +24,15 @@ ODDS_MARKETS = ["h2h", "totals", "spreads"]
 # Hasta 10 bookmakers cuentan como 1 región.
 TARGET_BOOKMAKERS = [
     "pinnacle",       # Referencia sharp (SIEMPRE incluir)
-    "onexbet",        # 1xBet ✓ confirmado
-    "marathonbet",    # Marathon Bet ✓ confirmado
-    "coolbet",        # Coolbet ✓ confirmado
-    "sport888",       # 888sport ✓ confirmado
-    "betway",         # Betway ✓ confirmado
-    "unibet",         # Unibet ✓ confirmado
-    "leovegas",       # LeoVegas ✓ confirmado
-    "nordicbet",      # Nordic Bet ✓ confirmado
-    # ❌ betsson removido — no disponible desde Costa Rica
+    "onexbet",        # 1xBet ✓ LATAM
+    "marathonbet",    # Marathon Bet ✓ LATAM
+    "coolbet",        # Coolbet ✓ (odds útiles)
+    "sport888",       # 888sport ✓ (odds útiles)
+    "betway",         # Betway ✓ LATAM
+    "unibet",         # Unibet ✓ (odds útiles)
+    "leovegas",       # LeoVegas ✓ (odds útiles)
+    "nordicbet",      # Nordic Bet ✓ (odds útiles)
+    "bovada",         # Bovada ✓ LATAM — reemplaza betsson
     # ── 10 bookmakers = 1 región = costo mínimo ──
     # Agregar más → 2 regiones → doble costo
     # ❌ No disponibles en API: betsafe, melbet, 20bet, bet365
