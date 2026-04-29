@@ -1473,8 +1473,10 @@ https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a
 https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga
 https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league
 
-# URLs DEDUCIDAS del patrón (confirmar si fallan):
+# URLs CONFIRMADAS adicionales:
 https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga
+
+# URLs DEDUCIDAS del patrón (confirmar si fallan):
 https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1
 https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league
 ```
