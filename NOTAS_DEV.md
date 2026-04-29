@@ -38,7 +38,34 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 23:35 — FIX v6: BetSafe filtrar links de partidos + wait_for_response events-table
+### 🔴 2026-04-27 23:45 — FIX v7: BetSafe buscar links /futbol/ Y /football/ (bilingual fix)
+
+**Basado en test 23:39:** v6 regresionó a 0 ligas. El selector `a[href*="/futbol/"]` devuelve 0 elementos.
+
+**Causa:** La página puede generar links con `/football/` (inglés) en vez de `/futbol/` (español).
+
+**Fix:** Buscar links en AMBOS idiomas + logging diagnóstico:
+```
+Links: /futbol/=0, /football/=12   ← ahora veremos cuál usa
+```
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"Links: /futbol/=N, /football/=M"` — ¿cuál tiene links?
+2. `"Encontradas N ligas en el menú"` — ¿N > 0?
+3. `"events-table interceptado para xxx"` — ¿aparece para ligas EU?
+4. `"BetSafe — Eventos con odds: N"` — ¿N > 12?
+
+---
+
+### ✅ 2026-04-27 23:35 — FIX v6: BetSafe filtrar links de partidos + wait_for_response events-table
 
 **Basado en test 23:25:** 12 eventos con La Liga completa ✅. Pero link discovery captura partidos individuales y EPL/Serie A/Ligue 1 no disparan events-table.
 

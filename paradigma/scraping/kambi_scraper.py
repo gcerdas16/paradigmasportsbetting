@@ -397,20 +397,28 @@ class BetSafeScraper:
 
             # Navegar a ligas haciendo click en links del sidebar/menú
             try:
-                all_links = page.query_selector_all('a[href*="/futbol/"]')
+                # Buscar links en ambos idiomas
+                links_es = page.query_selector_all('a[href*="/futbol/"]')
+                links_en = page.query_selector_all('a[href*="/football/"]')
+                all_links = links_es + links_en
+                logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}")
+
                 league_hrefs = []
                 for link in all_links:
                     href = link.get_attribute("href") or ""
                     text = (link.inner_text() or "").lower()
-                    # Filtrar: solo links de liga (1 segmento tras /futbol/)
-                    # Liga:    /futbol/espana-la-liga         → OK
-                    # Partido: /futbol/espana-la-liga/partido → SKIP
+                    # Filtrar: solo links de liga (1 segmento tras /futbol/ o /football/)
                     path = href.split("?")[0].rstrip("/")
-                    futbol_idx = path.find("/futbol/")
-                    if futbol_idx >= 0:
-                        after = path[futbol_idx + len("/futbol/"):]
-                        if "/" in after:
-                            continue  # es un partido individual, skip
+                    is_league = False
+                    for sport_slug in ["/futbol/", "/football/"]:
+                        idx = path.find(sport_slug)
+                        if idx >= 0:
+                            after = path[idx + len(sport_slug):]
+                            if after and "/" not in after:
+                                is_league = True
+                            break
+                    if not is_league:
+                        continue
                     for kw in self.LEAGUE_KEYWORDS:
                         if kw in text or kw in href.lower():
                             full_url = href if href.startswith("http") else f"https://www.betsafe.com{href}"
