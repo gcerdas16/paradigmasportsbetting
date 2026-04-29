@@ -76,6 +76,23 @@ for league_url in self.LEAGUE_URLS:
 
 ---
 
+### 2026-04-28 20:59 — BetSafe v10b — mismo resultado (1 evento), bugs sin corregir
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~2 min / **Exit code:** 0
+
+**Output:** 1 evento (Cerro Porteño vs Palmeiras). Partidos UCL disponibles (Nottingham Forest vs Aston Villa, jueves 30 abril) pero no capturados.
+
+**Los dos bugs críticos siguen presentes en v10b:**
+
+1. **Fallback URLs incorrectas** — el log muestra `Navegando a liga: england-premier-league` en vez de `england/england-premier-league`. El código construye la URL como `https://www.betsafe.com/en/sportsbook/football/england-premier-league` (URL inválida, falta el segmento `england/`).
+
+2. **`networkidle` sigue en las navegaciones de liga** — la página se queda en negro (timeout), events-table nunca dispara. Confirmado visualmente: el browser de BetSafe carga bien esa URL, pero Playwright no puede con `networkidle`.
+
+**Fix requerido (ya documentado arriba):** cambiar `networkidle` → `domcontentloaded` Y usar LEAGUE_URLS completas sin discovery dinámico.
+
+---
+
 ## Cómo usar
 
 1. Hacer `git pull` para obtener los últimos cambios de código
