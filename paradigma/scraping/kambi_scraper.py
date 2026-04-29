@@ -330,13 +330,7 @@ class BetSafeScraper:
     FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
     API_PATH_PREFIX = "/api/sb/v1/"
 
-    # Keywords para encontrar ligas europeas en links del sidebar
-    LEAGUE_KEYWORDS = [
-        "champions", "europa league", "premier", "la liga",
-        "bundesliga", "serie a", "ligue 1",
-    ]
-
-    # Fallback: URLs CONFIRMADAS manualmente por el usuario
+    # URLs CONFIRMADAS manualmente por el usuario
     FALLBACK_LEAGUE_URLS = [
         "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
         "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
@@ -395,83 +389,41 @@ class BetSafeScraper:
             # Cargar página principal primero
             try:
                 logger.info(f"  Navegando a {self.FOOTBALL_URL}")
-                page.goto(self.FOOTBALL_URL, wait_until="networkidle",
+                page.goto(self.FOOTBALL_URL, wait_until="domcontentloaded",
                          timeout=self.timeout_ms)
-                page.wait_for_timeout(5_000)
+                page.wait_for_timeout(8_000)
             except Exception as e:
                 logger.warning(f"  Timeout en carga inicial: {e}")
 
             # Scroll en la página principal
-            for _ in range(5):
+            for _ in range(3):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2_000)
 
-            # Navegar a UN partido por liga → events-table/v2 carga la liga completa
-            try:
-                links_sb = page.query_selector_all('a[href*="/sportsbook/football/"]')
-                links_fb = page.query_selector_all('a[href*="/football/"]')
-                links_es = page.query_selector_all('a[href*="/futbol/"]')
-                all_raw = links_sb + links_fb + links_es
-                # Dedup by href
-                seen_hrefs = set()
-                all_links = []
-                for lnk in all_raw:
-                    h = lnk.get_attribute("href") or ""
-                    if h and h not in seen_hrefs:
-                        seen_hrefs.add(h)
-                        all_links.append(lnk)
-                logger.info(f"  Links: /sportsbook/={len(links_sb)}, /football/={len(links_fb)}, /futbol/={len(links_es)}, unique={len(all_links)}")
-
-                # Extraer URL de liga: quitar último segmento (partido) del match URL
-                # /futbol/champions-league/atletico-arsenal → /futbol/champions-league
-                # /futbol/england/premier-league/xxx-yyy    → /futbol/england/premier-league
-                seen_leagues = set()
-                league_hrefs = []
-                for link in all_links:
-                    href = link.get_attribute("href") or ""
-                    text = (link.inner_text() or "").lower()
-                    path = href.split("?")[0].rstrip("/")
-                    # Quitar último segmento (nombre del partido)
-                    league_path = "/".join(path.split("/")[:-1])
-                    if not league_path or league_path in seen_leagues:
-                        continue
-                    # Solo ligas que nos interesan (keywords)
-                    for kw in self.LEAGUE_KEYWORDS:
-                        if kw in text or kw in league_path.lower():
-                            league_url = league_path if league_path.startswith("http") else f"https://www.betsafe.com{league_path}"
-                            league_hrefs.append(league_url)
-                            seen_leagues.add(league_path)
-                            logger.info(f"    Liga detectada: {league_path.split('/')[-1]}")
-                            break
-                # Agregar fallback URLs que no se hayan descubierto dinámicamente
-                for fb_url in self.FALLBACK_LEAGUE_URLS:
-                    if fb_url not in league_hrefs:
-                        league_hrefs.append(fb_url)
-                logger.info(f"  Total ligas a navegar: {len(league_hrefs)} (dinámicas + fallback)")
-                for lh in league_hrefs:
-                    try:
-                        slug = lh.split("/")[-1].split("?")[0]
-                        logger.info(f"  Navegando a liga: {slug}")
-                        page.goto(lh, wait_until="networkidle",
+            # Navegar a cada liga usando URLs confirmadas
+            logger.info(f"  Navegando a {len(self.FALLBACK_LEAGUE_URLS)} ligas confirmadas")
+            for lh in self.FALLBACK_LEAGUE_URLS:
+                slug = lh.split("/")[-1].split("?")[0]
+                try:
+                    logger.info(f"  → {slug}: {lh}")
+                    # Esperar events-table ANTES de que termine la navegación
+                    with page.expect_response(
+                        lambda r: "events-table" in r.url and r.status == 200,
+                        timeout=15_000
+                    ) as resp_info:
+                        page.goto(lh, wait_until="domcontentloaded",
                                  timeout=self.timeout_ms)
-                        # Esperar explícitamente a que events-table se cargue
-                        try:
-                            page.wait_for_response(
-                                lambda r: "events-table" in r.url and r.status == 200,
-                                timeout=10_000
-                            )
-                            logger.info(f"    events-table interceptado para {slug}")
-                        except Exception:
-                            logger.info(f"    events-table no disparó para {slug} (puede ser cache)")
-                        page.wait_for_timeout(2_000)
-                        for _ in range(2):
-                            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                            page.wait_for_timeout(1_500)
-                    except Exception as e:
-                        logger.warning(f"  Error en liga: {e}")
-                        continue
-            except Exception as e:
-                logger.warning(f"  Error buscando ligas en menú: {e}")
+                    logger.info(f"    ✓ events-table capturado para {slug}")
+                except Exception:
+                    # Si events-table no dispara, igual scroll para capturar otros endpoints
+                    logger.info(f"    events-table no disparó para {slug}")
+                try:
+                    page.wait_for_timeout(3_000)
+                    for _ in range(2):
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        page.wait_for_timeout(1_500)
+                except Exception as e:
+                    logger.warning(f"  Error en scroll de {slug}: {e}")
 
             page.wait_for_timeout(2_000)
             browser.close()

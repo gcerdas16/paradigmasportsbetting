@@ -38,7 +38,32 @@
 
 ## Entradas
 
-### 🔴 2026-04-28 20:45 — FIX v10b: BetSafe cambio completo a inglés + URLs corregidas
+### 🔴 2026-04-28 21:00 — FIX v11: BetSafe SIMPLIFICADO — solo URLs confirmadas + domcontentloaded
+
+**Basado en test 20:59:** v10b sigue con 1 evento. Dos bugs: 1) dynamic discovery genera URLs rotas, 2) `networkidle` causa timeout/pantalla negra.
+
+**Fix v11 — simplificación radical:**
+1. **ELIMINADO** todo el dynamic link discovery (fuente de bugs desde v5)
+2. **SOLO** se usan las 7 URLs confirmadas manualmente (FALLBACK_LEAGUE_URLS)
+3. **`networkidle` → `domcontentloaded`** en TODAS las navegaciones
+4. **`page.expect_response`** para capturar events-table DURANTE la navegación (no después)
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"→ england-premier-league: https://...england/england-premier-league"` — URL completa correcta
+2. `"✓ events-table capturado para xxx"` — ¿aparece para cada liga?
+3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 20**
+
+---
+
+### ✅ 2026-04-28 20:45 — FIX v10b: BetSafe cambio completo a inglés + URLs corregidas
 
 **Basado en test 20:34:** v10 dio 1 evento por HORARIO (02:36 UTC, sin partidos europeos). El código está bien, pero las URLs estaban mal.
 
