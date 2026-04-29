@@ -38,7 +38,36 @@
 
 ## Entradas
 
-### 🔴 2026-04-28 19:00 — FIX v9: BetSafe strip último segmento para obtener URL de liga
+### 🔴 2026-04-28 20:27 — FIX v10: BetSafe fallback URLs confirmadas (EPL, Bundesliga, Serie A, Ligue 1)
+
+**Basado en test 19:02:** v9 logró 52 eventos ✅ pero falta Premier League. URL confirmada por el usuario: `/futbol/inglaterra/inglaterra-premier-league`
+
+**Fix v10:** Patrón descubierto: `/futbol/{país}/{país}-{liga}`. Agregadas 7 URLs hardcodeadas como **fallback** (se agregan después del discovery dinámico, sin duplicar):
+- `inglaterra/inglaterra-premier-league`
+- `espana/espana-la-liga`
+- `alemania/alemania-bundesliga`
+- `italia/italia-serie-a`
+- `francia/francia-ligue-1`
+- `champions-league`
+- `europa-league`
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"Total ligas a navegar: N"` — N debería ser ~8-11 (dinámicas + fallback sin duplicados)
+2. `"Navegando a liga: inglaterra-premier-league"` — ¿aparece?
+3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 60** (52 + EPL + Bundesliga + Serie A + Ligue 1)
+4. Si alguna URL da error/timeout → reportar cuál
+
+---
+
+### ✅ 2026-04-28 19:00 — FIX v9: BetSafe strip último segmento para obtener URL de liga
 
 **Basado en test 18:58:** v8 detecta 3 ligas pero navega a URLs incorrectas. Causa: extrae primer segmento (`champions-league`, `inglaterra`, `italia`) pero para EPL/Serie A el primer segmento es el PAÍS, no la liga.
 

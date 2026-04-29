@@ -336,6 +336,17 @@ class BetSafeScraper:
         "bundesliga", "serie a", "ligue 1",
     ]
 
+    # Fallback: URLs confirmadas de ligas clave (patrón: /futbol/{país}/{país}-{liga})
+    FALLBACK_LEAGUE_URLS = [
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/inglaterra/inglaterra-premier-league",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/espana/espana-la-liga",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/alemania/alemania-bundesliga",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/italia/italia-serie-a",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/francia/francia-ligue-1",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/champions-league",
+        "https://www.betsafe.com/es/apuestas-deportivas/futbol/europa-league",
+    ]
+
     def __init__(self, headless: bool = True, timeout_ms: int = 60_000):
         self.headless = headless
         self.timeout_ms = timeout_ms
@@ -423,7 +434,11 @@ class BetSafeScraper:
                             seen_leagues.add(league_path)
                             logger.info(f"    Liga detectada: {league_path.split('/')[-1]}")
                             break
-                logger.info(f"  Ligas únicas encontradas: {len(league_hrefs)}")
+                # Agregar fallback URLs que no se hayan descubierto dinámicamente
+                for fb_url in self.FALLBACK_LEAGUE_URLS:
+                    if fb_url not in league_hrefs:
+                        league_hrefs.append(fb_url)
+                logger.info(f"  Total ligas a navegar: {len(league_hrefs)} (dinámicas + fallback)")
                 for lh in league_hrefs:
                     try:
                         slug = lh.split("/")[-1].split("?")[0]
