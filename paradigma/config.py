@@ -23,19 +23,19 @@ ODDS_MARKETS = ["h2h", "totals", "spreads"]
 # Usar param 'bookmakers' en vez de 'regions' → 6 books = 1 región equiv.
 # Hasta 10 bookmakers cuentan como 1 región.
 TARGET_BOOKMAKERS = [
-    "pinnacle",       # Referencia de precio justo (SIEMPRE incluir)
-    "onexbet",        # 1xBet (Costa Rica) ✓ confirmado en API + sitio
-    # ❌ betsson: NO disponible en Costa Rica
-    "marathonbet",    # Marathon Bet (Costa Rica) ✓ confirmado en API
-    "coolbet",        # Coolbet (Costa Rica) ✓ confirmado en API
-    "sport888",       # 888sport ✓ confirmado en API
-    "betway",         # Betway ✓ confirmado en API
-    "unibet",         # Unibet (genérico) ✓ confirmado en API
-    "leovegas",       # LeoVegas ✓ confirmado en API
-    "nordicbet",      # Nordic Bet ✓ confirmado en API
-    # ❌ bet365: NO existe en The Odds API
-    # ❌ twentybet: NO existe en The Odds API
-    # ❌ unibet_eu: NO existe (usar "unibet" genérico)
+    "pinnacle",       # Referencia sharp (SIEMPRE incluir)
+    "onexbet",        # 1xBet ✓ confirmado
+    "betsson",        # Betsson ✓ disponible en EU
+    "marathonbet",    # Marathon Bet ✓ confirmado
+    "coolbet",        # Coolbet ✓ confirmado
+    "sport888",       # 888sport ✓ confirmado
+    "betway",         # Betway ✓ confirmado
+    "unibet",         # Unibet ✓ confirmado
+    "leovegas",       # LeoVegas ✓ confirmado
+    "nordicbet",      # Nordic Bet ✓ confirmado
+    # ── 10 bookmakers = 1 región = costo mínimo ──
+    # Agregar más → 2 regiones → doble costo
+    # ❌ No disponibles en API: betsafe, melbet, 20bet, bet365
 ]
 
 # Exchanges a EXCLUIR de casas blandas (no son bookmakers tradicionales)
@@ -52,20 +52,17 @@ EXCHANGE_BOOK_KEYS = {
 # Deportes a monitorear (multi-deporte para acelerar validación)
 # Usar None para todos los deportes activos
 SPORTS = [
-    # --- Fútbol (3-way, sin mismatch) --- genera la mayoría de señales
+    # --- Fútbol (3-way) --- genera la mayoría de señales
     "soccer_epl",               # Premier League
     "soccer_spain_la_liga",     # La Liga
     "soccer_germany_bundesliga",# Bundesliga
     "soccer_italy_serie_a",     # Serie A
     "soccer_france_ligue_one",  # Ligue 1
     "soccer_uefa_champs_league",# Champions League
-    # --- Americanos (2-way, sin mismatch) ---
+    # --- Basketball (2-way) ---
     "basketball_nba",           # NBA
-    "baseball_mlb",             # MLB
-    # --- Estos pierden h2h por 2-way vs 3-way, pero totals/spreads siguen ---
-    "icehockey_nhl",            # NHL (h2h filtrado, totals/spreads OK)
-    "mma_mixed_martial_arts",   # MMA (h2h filtrado, solo h2h disponible)
-    # ❌ Removido: tennis_atp_french_open (0 eventos activos)
+    # ── Presupuesto: 7 deportes × 3 markets × 1 región = 21 créditos/scan
+    # ── A 30 min: 1,008 créditos/día → 20K duran ~20 días
 ]
 
 # ─── Pinnacle ───────────────────────────────────────────────
@@ -79,7 +76,7 @@ MAX_DAILY_EXPOSURE = 10.0       # Máximo 10% del bankroll en juego simultáneo
 STOP_LOSS_WEEKLY_PERCENT = 15.0 # Pausar si bankroll baja 15% en una semana
 
 # Bankroll inicial (paper trading)
-INITIAL_BANKROLL = 1000.0
+INITIAL_BANKROLL = 500.0
 
 # ─── Filtros adicionales ────────────────────────────────────
 MIN_ODDS_DECIMAL = 1.30         # No apostar a odds < 1.30 (muy bajas)
@@ -87,7 +84,7 @@ MAX_ODDS_DECIMAL = 10.0         # No apostar a odds > 10.0 (muy volátiles)
 MIN_BOOKMAKERS = 3              # Mínimo 3 casas con el mercado para confiar
 
 # ─── Scanner ────────────────────────────────────────────────
-SCAN_INTERVAL_MINUTES = 30      # Cada 30 min (señales tempranas, no necesita 15)
+SCAN_INTERVAL_MINUTES = 45      # Cada 45 min (20K créditos duran ~30 días)
 ODDS_FORMAT = "decimal"         # Formato de odds (decimal para cálculos)
 USE_BOOKMAKERS_PARAM = True     # True = usar param bookmakers (4x más barato)
 

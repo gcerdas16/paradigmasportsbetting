@@ -195,3 +195,12 @@ class ValueScanner:
             print("\n--- Estadísticas finales ---")
             for k, v in stats.items():
                 print(f"  {k}: {v}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    scanner = ValueScanner()
+    scanner.run_loop()
