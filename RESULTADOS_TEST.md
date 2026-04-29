@@ -1479,7 +1479,7 @@ https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga
 # URLs CONFIRMADAS adicionales:
 https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1
 
-# URLs DEDUCIDAS del patrón (confirmar si fallan):
+# URL CONFIRMADA:
 https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league
 ```
 
