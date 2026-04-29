@@ -1423,9 +1423,9 @@ Ligas capturadas:
 
 **Nota: "events-table no disparó" en el log es un falso positivo** — el `wait_for_response` se llama DESPUÉS del `wait_until="networkidle"`, entonces el response ya pasó antes del listener. Pero el `on_response` handler SÍ los capturó (85 responses totales vs 17-19 en versiones anteriores).
 
-**Pendiente:**
-1. **Premier League inglesa no aparece** — se navega a `/futbol/inglaterra` (URL de país, no liga) → carga muchas ligas inglesas menores pero no EPL. Para EPL necesitaría `/futbol/england/premier-league` o similar
-2. **Cerro Porteño sigue con 1 sel** — viene de event-market/v1, no de events-table (baja prioridad)
-3. **Atlético vs Arsenal (UCL)** — no aparece, probablemente el partido ya fue (semifinal de vuelta fue ayer)
+**Pendiente — prioridad:**
+1. 🔴 **Premier League MUST HAVE** — actualmente navega a `/futbol/inglaterra` (URL de PAÍS) que carga ligas menores inglesas. El link de EPL en la página tiene slug diferente (probablemente `/futbol/england/premier-league` o `/futbol/inglaterra/premier-league`). Sin EPL el overlap con Pinnacle es limitado — es la liga con más eventos en Pinnacle.
+2. ⚠️ **Cerro Porteño sigue con 1 sel** — viene de event-market/v1, baja prioridad
+3. **Atlético vs Arsenal (UCL)** — no aparece porque el partido ya fue
 
 **Debug:** `scraping_debug/betsafe_betsson_20260429_010352.json`
