@@ -31,6 +31,14 @@ Cambios requeridos en `kambi_scraper.py`:
 
 **Test debe correrse entre 12:00-15:00 hora Costa Rica** (partidos europeos upcoming).
 
+⚠️ **Bug detectado en fallback URLs:** el scraper navega a `england-premier-league` en vez de `england/england-premier-league` — le falta el segmento de país. Verificar que el full_url se construye como `https://www.betsafe.com/en/sportsbook/football/england/england-premier-league` (2 segmentos tras `/football/`).
+
+⚠️ **Bug crítico — Playwright se queda en negro en las páginas de liga:**
+- URL `https://www.betsafe.com/en/sportsbook/football/england/england-premier-league` carga perfectamente en browser normal (hay partidos EPL: Leeds, Newcastle vs Brighton, sábado 3 mayo)
+- Pero cuando Playwright navega a esa URL → pantalla negra, nunca carga, `networkidle` nunca dispara
+- Causa probable: `wait_until="networkidle"` falla porque la página hace polling continuo de live scores, O BetSafe detecta Playwright como bot en páginas de liga específicas
+- Fix recomendado: cambiar `wait_until="networkidle"` por `wait_until="domcontentloaded"` + `page.wait_for_timeout(5000)` para las navegaciones de liga
+
 ---
 
 ## Cómo usar
