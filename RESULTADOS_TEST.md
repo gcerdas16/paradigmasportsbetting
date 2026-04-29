@@ -1395,3 +1395,37 @@ league_path = "/".join(match_path.split("/")[:-1])  # quita el último segmento
 **Hecho positivo:** La estructura de URL confirmada: `/futbol/champions-league/xxx` (UCL no tiene país prefix). Los 21 links de la página dan cobertura a 3 ligas distintas que sí tienen partidos hoy.
 
 **Debug:** `scraping_debug/betsafe_betsson_20260429_005903.json`
+
+---
+
+### 2026-04-28 19:02 — BetSafe v9: strip último segmento → 52 eventos ✅
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~1.5 min
+**Exit code:** 0
+
+**Output:**
+```
+Links: /futbol/=21, /football/=0
+Ligas únicas encontradas: 4 (champions-league, uefa-champions-league, inglaterra, espana)
+BetSafe: 85 API responses capturadas
+BetSafe: 52 eventos con odds
+
+Ligas capturadas:
+  UEFA Champions League: Bayern de Múnich vs Paris SG → 1.72 / 4.65 / 4.20 ✅
+  España La Liga:        Villarreal, Valencia, Alaves, Osasuna, Celta Vigo, Girona, Espanyol, Getafe, Real Betis (10 partidos) ✅
+  España Segunda Div:    Cultural Leonesa, Castellon, Eibar, Zaragoza, Deportivo, etc. ✅
+  España Primera RFEF:   Ferrol, Gimnàstic, CF Talavera, Sporting Gijón, etc. ✅
+  España 2ª RFEF/3ª:     CD Llosetense, Real Madrid Castilla, Betis Deportivo, etc. ✅
+  Inglaterra (ligas bajas): National League, Southern, Isthmian (arsenal femenino, Boreham Wood, etc.) ✅
+  Copa Libertadores:     Cerro Porteño vs Palmeiras (solo 1 sel — sigue el bug de event-market/v1)
+```
+
+**Nota: "events-table no disparó" en el log es un falso positivo** — el `wait_for_response` se llama DESPUÉS del `wait_until="networkidle"`, entonces el response ya pasó antes del listener. Pero el `on_response` handler SÍ los capturó (85 responses totales vs 17-19 en versiones anteriores).
+
+**Pendiente:**
+1. **Premier League inglesa no aparece** — se navega a `/futbol/inglaterra` (URL de país, no liga) → carga muchas ligas inglesas menores pero no EPL. Para EPL necesitaría `/futbol/england/premier-league` o similar
+2. **Cerro Porteño sigue con 1 sel** — viene de event-market/v1, no de events-table (baja prioridad)
+3. **Atlético vs Arsenal (UCL)** — no aparece, probablemente el partido ya fue (semifinal de vuelta fue ayer)
+
+**Debug:** `scraping_debug/betsafe_betsson_20260429_010352.json`
