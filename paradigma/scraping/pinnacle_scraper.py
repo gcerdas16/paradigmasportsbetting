@@ -357,6 +357,7 @@ class PinnacleScraper:
                 "commence_time": start_time,
                 "sport_key": "soccer",
                 "sport_title": f"Soccer - {league}",
+                "event_link": self._build_match_url(matchup),
             })
 
             event_markets = {}

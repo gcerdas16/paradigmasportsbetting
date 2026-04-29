@@ -97,6 +97,7 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
     pin_events_with_odds = [
         evt for evt in pinnacle_events if evt["event_id"] in pinnacle_data
     ]
+    pin_link_map = {evt["event_id"]: evt.get("event_link", "") for evt in pin_events_with_odds}
 
     # ── 2. Scrape soft books ──────────────────────────────────────
     unified_pinnacle = {}
@@ -156,6 +157,8 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
             if s_eid in soft_data:
                 p_home = p_evt["home_team"]
                 p_away = p_evt["away_team"]
+                s_link = s_evt.get("event_link", "")
+                p_link = pin_link_map.get(p_eid, "")
 
                 for market_key, outcomes in soft_data[s_eid].items():
                     for (outcome_name, outcome_point), odds in outcomes.items():
@@ -179,8 +182,8 @@ def scan_once(headless: bool = True, book_keys: list = None) -> list:
                             "outcome_name": final_name,
                             "outcome_point": outcome_point,
                             "odds": odds,
-                            "book_link": None,
-                            "market_link": None,
+                            "book_link": s_link,
+                            "market_link": p_link,
                             "outcome_link": None,
                         })
 
@@ -299,6 +302,10 @@ def print_results(value_bets: list, near_misses: list = None):
             print(f"     Apuesta: {vb.outcome_name}{pt_str} @ {vb.odds:.3f} ({vb.book_title}){pin_str}")
             print(f"     EV: {vb.ev_percent:+.2f}%  |  Kelly: {vb.kelly_stake_percent:.2f}%")
             print(f"     Fair prob: {vb.fair_prob:.4f}")
+            if vb.book_link:
+                print(f"     🔗 {vb.book_title}: {vb.book_link}")
+            if vb.market_link:
+                print(f"     📊 Pinnacle: {vb.market_link}")
 
         avg_ev = sum(vb.ev_percent for vb in value_bets) / len(value_bets)
         avg_kelly = sum(vb.kelly_stake_percent for vb in value_bets) / len(value_bets)

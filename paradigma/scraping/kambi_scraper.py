@@ -223,6 +223,13 @@ class Sport888Scraper:
         if markets:
             soft_odds[event_id] = markets
 
+        slug = evt.get("slug", "")
+        tournament_slug = evt.get("tournament_slug", "")
+        if slug and tournament_slug:
+            event_link = f"https://www.888sport.es/futbol/{tournament_slug}/{slug}/"
+        else:
+            event_link = ""
+
         events_info.append({
             "event_id": event_id,
             "home_team": home,
@@ -233,6 +240,7 @@ class Sport888Scraper:
             "sport_title": f"Soccer - {league}",
             "book_key": "888sport",
             "book_name": "888sport",
+            "event_link": event_link,
         })
 
     @staticmethod
@@ -578,6 +586,12 @@ class BetSafeScraper:
             soft_odds[event_id] = markets
             logger.info(f"  ✓ {home} vs {away}: {markets}")
 
+        betsafe_slug = evt.get("slug", "")
+        event_link = (
+            f"https://www.betsafe.com/en/sportsbook/{betsafe_slug}?tab=liveAndUpcoming"
+            if betsafe_slug else ""
+        )
+
         events_info.append({
             "event_id": event_id,
             "home_team": home,
@@ -588,6 +602,7 @@ class BetSafeScraper:
             "sport_title": f"Soccer - {league}",
             "book_key": "betsafe",
             "book_name": "BetSafe",
+            "event_link": event_link,
         })
 
     @staticmethod

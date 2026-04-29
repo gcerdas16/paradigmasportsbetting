@@ -88,6 +88,14 @@ BOOK_CONFIGS = {
 # Directorio de debug output
 DEBUG_DIR = Path("scraping_debug")
 
+# Mapeo league_id → URL segment para construcción de links de eventos
+_LEAGUE_ID_TO_SLUG: dict[str, str] = {}
+for _cfg in BOOK_CONFIGS.values():
+    for _u in _cfg.get("league_urls", []):
+        _seg = _u.rstrip("/").split("/")[-1]   # "88637-england-premier-league"
+        _lid = _seg.split("-")[0]
+        _LEAGUE_ID_TO_SLUG[_lid] = _seg
+
 # Sport ID para fútbol en 1xBet
 FOOTBALL_SPORT_ID = 1
 
@@ -322,17 +330,26 @@ class OneXBetScraper:
             seen_ids.add(eid)
             if parsed["markets"]:
                 soft_odds[eid] = parsed["markets"]
+            league_id = str(parsed.get("league_id", ""))
+            base = self.book_config["football_url"].split("/en/")[0]
+            league_seg = _LEAGUE_ID_TO_SLUG.get(league_id, "")
+            if league_seg:
+                event_link = f"{base}/en/line/football/{league_seg}/{eid}"
+            else:
+                event_link = f"{base}/en/line/football"
+
             events_info.append({
                 "event_id": eid,
                 "home_team": parsed["home"],
                 "away_team": parsed["away"],
                 "league": parsed["league"],
-                "league_id": parsed.get("league_id", ""),
+                "league_id": league_id,
                 "commence_time": parsed["start_time"],
                 "sport_key": "soccer",
                 "sport_title": f"Soccer - {parsed['league']}",
                 "book_key": self.book_key,
                 "book_name": self.book_config["name"],
+                "event_link": event_link,
             })
 
         return soft_odds, events_info
