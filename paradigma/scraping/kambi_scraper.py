@@ -402,32 +402,26 @@ class BetSafeScraper:
                 all_links = links_es + links_en
                 logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}")
 
-                # Extraer liga slug de cada link y quedarnos con 1 match por liga
+                # Extraer URL de liga: quitar último segmento (partido) del match URL
+                # /futbol/champions-league/atletico-arsenal → /futbol/champions-league
+                # /futbol/england/premier-league/xxx-yyy    → /futbol/england/premier-league
                 seen_leagues = set()
                 league_hrefs = []
                 for link in all_links:
                     href = link.get_attribute("href") or ""
                     text = (link.inner_text() or "").lower()
                     path = href.split("?")[0].rstrip("/")
-                    # Extraer liga: /futbol/champions-league/match → "champions-league"
-                    league_slug = ""
-                    for sport_slug in ["/futbol/", "/football/"]:
-                        idx = path.find(sport_slug)
-                        if idx >= 0:
-                            after = path[idx + len(sport_slug):]
-                            parts = after.split("/")
-                            if parts:
-                                league_slug = parts[0]
-                            break
-                    if not league_slug or league_slug in seen_leagues:
+                    # Quitar último segmento (nombre del partido)
+                    league_path = "/".join(path.split("/")[:-1])
+                    if not league_path or league_path in seen_leagues:
                         continue
                     # Solo ligas que nos interesan (keywords)
                     for kw in self.LEAGUE_KEYWORDS:
-                        if kw in text or kw in href.lower() or kw in league_slug:
-                            full_url = href if href.startswith("http") else f"https://www.betsafe.com{href}"
-                            league_hrefs.append(full_url)
-                            seen_leagues.add(league_slug)
-                            logger.info(f"    Liga detectada: {league_slug}")
+                        if kw in text or kw in league_path.lower():
+                            league_url = league_path if league_path.startswith("http") else f"https://www.betsafe.com{league_path}"
+                            league_hrefs.append(league_url)
+                            seen_leagues.add(league_path)
+                            logger.info(f"    Liga detectada: {league_path.split('/')[-1]}")
                             break
                 logger.info(f"  Ligas únicas encontradas: {len(league_hrefs)}")
                 for lh in league_hrefs:

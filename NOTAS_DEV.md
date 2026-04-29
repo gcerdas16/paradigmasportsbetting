@@ -38,7 +38,34 @@
 
 ## Entradas
 
-### 🔴 2026-04-28 18:55 — FIX v8: BetSafe "un partido por liga" (fix del filtro de segmentos)
+### 🔴 2026-04-28 19:00 — FIX v9: BetSafe strip último segmento para obtener URL de liga
+
+**Basado en test 18:58:** v8 detecta 3 ligas pero navega a URLs incorrectas. Causa: extrae primer segmento (`champions-league`, `inglaterra`, `italia`) pero para EPL/Serie A el primer segmento es el PAÍS, no la liga.
+
+**Fix v9:** En vez de extraer el primer segmento, **quitar el último segmento** (nombre del partido):
+```
+/futbol/champions-league/atletico-arsenal  → /futbol/champions-league       ✅
+/futbol/england/premier-league/xxx-yyy     → /futbol/england/premier-league ✅
+/futbol/italia/serie-a/xxx                 → /futbol/italia/serie-a         ✅
+```
+Navega a la **página de liga** directamente (no al partido).
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"Liga detectada: champions-league"` / `"premier-league"` / `"serie-a"` etc.
+2. `"events-table interceptado para xxx"` — ¿dispara para cada liga?
+3. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 20**
+
+---
+
+### ✅ 2026-04-28 18:55 — FIX v8: BetSafe "un partido por liga" (fix del filtro de segmentos)
 
 **Basado en test 18:53:** v7 tiene 21 links `/futbol/` pero TODOS son de partidos (2 segmentos: `liga/partido`). Filtro de 1 segmento los elimina todos → 0 ligas.
 
