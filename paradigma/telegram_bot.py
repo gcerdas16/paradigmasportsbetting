@@ -38,11 +38,23 @@ class TelegramNotifier:
         pinnacle_str = f" (Pinnacle: {vb.pinnacle_odds:.2f})" if vb.pinnacle_odds else ""
         link_str = f"🔗 [Apostar aqui]({vb.best_link})\n" if vb.best_link else ""
 
+        # Detectar deporte
+        sport_key = getattr(vb, "sport_key", "") or ""
+        if "soccer" in sport_key:
+            sport_emoji = "⚽"
+            sport_label = "Fútbol"
+        elif "basketball" in sport_key:
+            sport_emoji = "🏀"
+            sport_label = "Baloncesto"
+        else:
+            sport_emoji = "🎯"
+            sport_label = "Otro"
+
         msg = (
             f"{'📝' if config.PAPER_TRADING else '💰'} *{mode} BET*\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"⚽ *{vb.home_team}* vs *{vb.away_team}*\n"
-            f"🏷️ {vb.sport_title}\n"
+            f"{sport_emoji} *{sport_label}* — {vb.sport_title}\n"
+            f"{sport_emoji} *{vb.home_team}* vs *{vb.away_team}*\n"
             f"📅 {vb.commence_time[:16]}\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"🎯 *{vb.outcome_name}{point_str}* ({vb.market})\n"
