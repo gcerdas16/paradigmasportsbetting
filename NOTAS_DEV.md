@@ -38,7 +38,34 @@
 
 ## Entradas
 
-### 🔴 2026-04-27 23:45 — FIX v7: BetSafe buscar links /futbol/ Y /football/ (bilingual fix)
+### 🔴 2026-04-28 18:55 — FIX v8: BetSafe "un partido por liga" (fix del filtro de segmentos)
+
+**Basado en test 18:53:** v7 tiene 21 links `/futbol/` pero TODOS son de partidos (2 segmentos: `liga/partido`). Filtro de 1 segmento los elimina todos → 0 ligas.
+
+**Hallazgo clave:** En v5 funcionaba PORQUE navegaba a páginas de partidos individuales — al entrar a un partido de UCL, `events-table/v2` carga TODA la UCL.
+
+**Fix v8:** Extraer el slug de liga de cada link de partido, deduplicar, navegar a solo **1 partido por liga**:
+- `/futbol/champions-league/atletico-madrid-arsenal` → liga = `champions-league` → navegar
+- `/futbol/champions-league/otro-partido` → liga = `champions-league` → SKIP (ya cubierta)
+- `/futbol/premier-league/xxx-yyy` → liga = `premier-league` → navegar
+
+**INSTRUCCIONES PARA TESTEAR:**
+
+```bash
+git pull
+cd paradigma
+python -m scraping.kambi_scraper --book betsafe --no-headless
+```
+
+**Qué buscar:**
+1. `"Liga detectada: champions-league"` / `"premier-league"` etc. — ¿aparecen varias ligas?
+2. `"Ligas únicas encontradas: N"` — ¿N >= 3?
+3. `"events-table interceptado para xxx"` — ¿dispara para cada liga?
+4. `"BetSafe — Eventos con odds: N"` — objetivo: **>= 30 eventos** (como v5 pero con más ligas)
+
+---
+
+### ✅ 2026-04-27 23:45 — FIX v7: BetSafe buscar links /futbol/ Y /football/ (bilingual fix)
 
 **Basado en test 23:39:** v6 regresionó a 0 ligas. El selector `a[href*="/futbol/"]` devuelve 0 elementos.
 

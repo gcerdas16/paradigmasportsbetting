@@ -395,37 +395,41 @@ class BetSafeScraper:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(2_000)
 
-            # Navegar a ligas haciendo click en links del sidebar/menú
+            # Navegar a UN partido por liga → events-table/v2 carga la liga completa
             try:
-                # Buscar links en ambos idiomas
                 links_es = page.query_selector_all('a[href*="/futbol/"]')
                 links_en = page.query_selector_all('a[href*="/football/"]')
                 all_links = links_es + links_en
                 logger.info(f"  Links: /futbol/={len(links_es)}, /football/={len(links_en)}")
 
+                # Extraer liga slug de cada link y quedarnos con 1 match por liga
+                seen_leagues = set()
                 league_hrefs = []
                 for link in all_links:
                     href = link.get_attribute("href") or ""
                     text = (link.inner_text() or "").lower()
-                    # Filtrar: solo links de liga (1 segmento tras /futbol/ o /football/)
                     path = href.split("?")[0].rstrip("/")
-                    is_league = False
+                    # Extraer liga: /futbol/champions-league/match → "champions-league"
+                    league_slug = ""
                     for sport_slug in ["/futbol/", "/football/"]:
                         idx = path.find(sport_slug)
                         if idx >= 0:
                             after = path[idx + len(sport_slug):]
-                            if after and "/" not in after:
-                                is_league = True
+                            parts = after.split("/")
+                            if parts:
+                                league_slug = parts[0]
                             break
-                    if not is_league:
+                    if not league_slug or league_slug in seen_leagues:
                         continue
+                    # Solo ligas que nos interesan (keywords)
                     for kw in self.LEAGUE_KEYWORDS:
-                        if kw in text or kw in href.lower():
+                        if kw in text or kw in href.lower() or kw in league_slug:
                             full_url = href if href.startswith("http") else f"https://www.betsafe.com{href}"
-                            if full_url not in league_hrefs:
-                                league_hrefs.append(full_url)
+                            league_hrefs.append(full_url)
+                            seen_leagues.add(league_slug)
+                            logger.info(f"    Liga detectada: {league_slug}")
                             break
-                logger.info(f"  Encontradas {len(league_hrefs)} ligas en el menú")
+                logger.info(f"  Ligas únicas encontradas: {len(league_hrefs)}")
                 for lh in league_hrefs:
                     try:
                         slug = lh.split("/")[-1].split("?")[0]
