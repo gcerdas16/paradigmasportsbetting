@@ -14,13 +14,13 @@ BetSafe usa `/en/sportsbook/football/` (inglés), NO `/es/apuestas-deportivas/fu
 FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
 
 LEAGUE_URLS = [
-    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
-    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
-    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
-    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
-    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
-    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league",
-    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league",
+    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league?tab=liveAndUpcoming",
 ]
 ```
 
@@ -31,13 +31,13 @@ LEAGUE_URLS = [
 FOOTBALL_URL = "https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming"
 
 LEAGUE_URLS = [
-    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league",
-    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga",
-    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga",
-    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a",
-    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1",
-    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league",
-    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league",
+    "https://www.betsafe.com/en/sportsbook/football/england/england-premier-league?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league?tab=liveAndUpcoming",
+    "https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league?tab=liveAndUpcoming",
 ]
 ```
 
