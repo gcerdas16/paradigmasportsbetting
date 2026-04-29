@@ -1334,3 +1334,64 @@ Links de liga (1 segmento) como /futbol/champions-league → NO existen en liveA
 ```
 
 **Debug:** `scraping_debug/betsafe_betsson_20260429_005358.json`
+
+---
+
+### 2026-04-28 18:58 — BetSafe v8: un partido por liga — detecta 3 ligas pero events-table no dispara
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~1 min
+**Exit code:** 0
+
+**Output:**
+```
+Links: /futbol/=21, /football/=0
+Liga detectada: champions-league
+Liga detectada: inglaterra
+Liga detectada: italia
+Ligas únicas encontradas: 3
+Navegando a liga: uefa-champions-league   → events-table no disparó
+Navegando a liga: inglaterra-premier-league → events-table no disparó
+Navegando a liga: italia-serie-a          → events-table no disparó
+BetSafe: 1 evento con odds (Cerro Porteño vs Palmeiras, 1 sel)
+```
+
+**Diagnóstico — dos problemas:**
+
+**Problema 1 — URL remapping crea slugs incorrectos:**
+```
+Slug extraído del match URL → URL navegada
+  champions-league  →  uefa-champions-league      ← transformación incorrecta?
+  inglaterra        →  inglaterra-premier-league  ← "inglaterra" no es un slug de liga
+  italia            →  italia-serie-a             ← "italia" no es un slug de liga
+```
+
+Si los match URLs tienen estructura de 3 niveles: `/futbol/PAIS/LIGA/PARTIDO`:
+- `/futbol/inglaterra/premier-league/xxx` → extrae `inglaterra` (país, no liga)
+- `/futbol/italia/serie-a/xxx` → extrae `italia` (país, no liga)
+- `/futbol/champions-league/xxx` → extrae `champions-league` (liga directa)
+
+El código extrae el primer segmento tras `/futbol/` pero para EPL/Serie A ese es el PAÍS, no la liga.
+
+**Solución correcta — usar el URL completo del match y quitar solo el último segmento:**
+```python
+# Del match URL /futbol/espana-la-liga/sevilla-real-sociedad
+# → strip último segmento → /futbol/espana-la-liga  ← URL de liga correcto
+
+# Del match URL /futbol/england/premier-league/man-utd-liverpool
+# → strip último segmento → /futbol/england/premier-league
+# → URL correcto para navegar
+
+match_path = "/es/apuestas-deportivas/futbol/champions-league/atletico-arsenal"
+league_path = "/".join(match_path.split("/")[:-1])  # quita el último segmento
+# → /es/apuestas-deportivas/futbol/champions-league  ✅
+```
+
+**Problema 2 — events-table no dispara aunque la liga carga:**
+- Puede ser consecuencia del Problema 1 (URL malo → página errónea → sin events-table)
+- O: el browser usa cache tras la primera navegación y events-table no re-dispara
+- Fix: usar `page.route` para forzar cache bypass, o `page.context.clear_cookies()` entre ligas
+
+**Hecho positivo:** La estructura de URL confirmada: `/futbol/champions-league/xxx` (UCL no tiene país prefix). Los 21 links de la página dan cobertura a 3 ligas distintas que sí tienen partidos hoy.
+
+**Debug:** `scraping_debug/betsafe_betsson_20260429_005903.json`
