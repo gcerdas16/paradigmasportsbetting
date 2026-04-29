@@ -6,6 +6,15 @@
 
 ---
 
+## ✅ ESTADO BETSAFE — v11 FUNCIONA (actualizado 2026-04-28 21:15 CR)
+
+**BetSafe v11 capturó 52 eventos (51 con 1X2 completo) el 28 abril a las 21:15 CR.**
+EPL ✅ | Bundesliga ✅ | Serie A ✅ | La Liga ✅ | Ligue 1 ✅ | Europa League ✅ | UCL ⚪ (no era jornada)
+
+**Próximo paso para dev PC:** correr `scanner_v2` combinado (ver abajo).
+
+---
+
 ## 🔴 INSTRUCCIONES PARA DEV PC — BetSafe v11 (actualizado 2026-04-28 21:00 CR)
 
 BetSafe usa `/en/sportsbook/football/` (inglés), NO `/es/apuestas-deportivas/futbol/`. URLs **confirmadas manualmente**:
@@ -73,6 +82,46 @@ for league_url in self.LEAGUE_URLS:
 - ❌ `networkidle` en páginas de liga → pantalla negra, nunca termina
 - ❌ Link discovery dinámico → extrae slugs incompletos (falta segmento de país)
 - ✅ `domcontentloaded` debería funcionar — events-table dispara apenas carga el DOM
+
+---
+
+### 2026-04-28 21:15 — BetSafe v11 (2do run) — 52 eventos ✅ FUNCIONA
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~3 min / **Exit code:** 0 / **Debug:** `scraping_debug/betsafe_betsson_20260429_031541.json` (49.9 MB)
+
+**Output: 52 eventos con odds — 51 con 3 selecciones (1X2 completo)**
+
+```
+Liga                      | Eventos | 3-odds
+--------------------------|---------|-------
+England Premier League    |    5    |   5 ✅
+Europa League             |    2    |   2 ✅
+France Ligue 1            |    9    |   9 ✅
+Germany Bundesliga        |   15    |  15 ✅
+Italy Serie A             |   10    |  10 ✅
+Spain La Liga             |   10    |  10 ✅
+Copa Libertadores (extra) |    1    |   0 ⚠️
+TOTAL                     |   52    |  51
+```
+
+**Matches destacados capturados:**
+- EPL: Leeds-Burnley, Newcastle-Brighton, Arsenal-Fulham, Brentford-West Ham, Wolves-Sunderland
+- EL: Sporting Braga vs SC Freiburg, Nottingham Forest vs Aston Villa
+- Bundesliga: Bayern Munich vs Heidenheim, Bayer Leverkusen vs RB Leipzig, BVB vs Frankfurt
+- Serie A: Inter vs Parma, Juventus vs Verona, Roma vs Fiorentina, Como vs Napoli
+- La Liga: Osasuna vs Barcelona, Espanyol vs Real Madrid, Valencia vs Atlético Madrid
+- UCL: 0 eventos (no era jornada UCL el 28-29 abril — esperado)
+
+**Estado del scraper v11:**
+- ✅ `domcontentloaded` en navegación de ligas (no más pantalla negra)
+- ✅ 3 scrolls en página principal + 2 scrolls por liga
+- ✅ URLs correctas (sin discovery dinámico)
+- ✅ `events-table/v2` disparó para 6 de 7 ligas (UCL no tenía matches)
+- ℹ️ Sin `?tab=liveAndUpcoming` en LEAGUE_URLS pero funciona igual
+- ⚠️ Cerro Porteño-Palmeiras (Copa Lib) capturado pero sin HOME odd — bug menor, ignorar
+
+**Conclusión: BetSafe v11 FUNCIONA. Listo para integrar al scanner combinado.**
 
 ---
 
