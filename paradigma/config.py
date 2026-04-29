@@ -25,7 +25,6 @@ ODDS_MARKETS = ["h2h", "totals", "spreads"]
 TARGET_BOOKMAKERS = [
     "pinnacle",       # Referencia sharp (SIEMPRE incluir)
     "onexbet",        # 1xBet ✓ confirmado
-    "betsson",        # Betsson ✓ disponible en EU
     "marathonbet",    # Marathon Bet ✓ confirmado
     "coolbet",        # Coolbet ✓ confirmado
     "sport888",       # 888sport ✓ confirmado
@@ -33,6 +32,7 @@ TARGET_BOOKMAKERS = [
     "unibet",         # Unibet ✓ confirmado
     "leovegas",       # LeoVegas ✓ confirmado
     "nordicbet",      # Nordic Bet ✓ confirmado
+    # ❌ betsson removido — no disponible desde Costa Rica
     # ── 10 bookmakers = 1 región = costo mínimo ──
     # Agregar más → 2 regiones → doble costo
     # ❌ No disponibles en API: betsafe, melbet, 20bet, bet365
