@@ -1463,6 +1463,26 @@ Los "events-table no disparó" en v10 son **verdaderos negativos** — events-ta
 
 **Conclusión: el código v10 está bien. Hay que re-testar en horario correcto (12:00-17:00 CR) cuando los partidos europeos sean "upcoming".**
 
-**Para el dev PC:** No hacer rollback. v10 es correcto con los fallback URLs. La premier league se testea mañana en horario europeo.
+**Para el dev PC:** No hacer rollback. Pero los fallback URLs son incorrectos — BetSafe usa `/en/sportsbook/football/` (inglés), NO `/es/apuestas-deportivas/futbol/`. URLs confirmadas manualmente:
+
+```
+# Estructura: /en/sportsbook/football/{país}/{país-liga}
+# URLs CONFIRMADAS manualmente:
+https://www.betsafe.com/en/sportsbook/football/england/england-premier-league
+https://www.betsafe.com/en/sportsbook/football/italy/italy-serie-a
+https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga
+https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league
+
+# URLs DEDUCIDAS del patrón (confirmar si fallan):
+https://www.betsafe.com/en/sportsbook/football/germany/germany-bundesliga
+https://www.betsafe.com/en/sportsbook/football/france/france-ligue-1
+https://www.betsafe.com/en/sportsbook/football/europa-league/europa-league
+```
+
+**Fixes requeridos en kambi_scraper.py:**
+1. `FOOTBALL_URL` → cambiar a `https://www.betsafe.com/en/sportsbook/football?tab=liveAndUpcoming`
+2. Selector → cambiar `a[href*="/futbol/"]` por `a[href*="/sportsbook/football/"]`
+3. `LEAGUE_URLS` fallback → usar las URLs confirmadas arriba
+4. `full_url` builder → `https://www.betsafe.com` + href (los hrefs ahora empiezan con `/en/sportsbook/football/`)
 
 **Debug:** `scraping_debug/betsafe_betsson_20260429_023631.json`
