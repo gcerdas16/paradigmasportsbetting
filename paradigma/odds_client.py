@@ -297,6 +297,16 @@ _DNS_OVERRIDES: dict[str, str] = {}
 
 def _resolve_via_google_dns(hostname: str) -> Optional[str]:
     """Resuelve un hostname usando Google DNS (8.8.8.8)."""
+    # Primero intentar resolución estándar (funciona en Railway/Linux)
+    try:
+        import socket
+        ip = socket.gethostbyname(hostname)
+        if ip and ip[0].isdigit():
+            return ip
+    except Exception:
+        pass
+
+    # Fallback: nslookup via Google DNS (para redes corporativas con OpenDNS)
     try:
         result = subprocess.run(
             ["nslookup", hostname, "8.8.8.8"],
