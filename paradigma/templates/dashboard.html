@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paradigma — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-2: #1a1a26;
+            --border: #2a2a3a;
+            --text: #e8e8ed;
+            --text-dim: #8888a0;
+            --accent: #6c5ce7;
+            --accent-dim: rgba(108, 92, 231, 0.12);
+            --green: #00d68f;
+            --green-dim: rgba(0, 214, 143, 0.12);
+            --red: #ff6b6b;
+            --red-dim: rgba(255, 107, 107, 0.12);
+            --yellow: #ffd93d;
+            --yellow-dim: rgba(255, 217, 61, 0.12);
+            --blue: #4ecdc4;
+            --blue-dim: rgba(78, 205, 196, 0.12);
+            --radius: 12px;
+            --font: 'Space Grotesk', -apple-system, sans-serif;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 20px;
+        }
+
+        /* ─── Header ─── */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), #a29bfe);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .logo i { font-size: 18px; color: white; }
+        .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .badge {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        .badge-paper { background: var(--yellow-dim); color: var(--yellow); }
+        .badge-live { background: var(--green-dim); color: var(--green); }
+        .timestamp { font-size: 13px; color: var(--text-dim); font-family: var(--mono); }
+
+        /* ─── KPI Cards ─── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .kpi {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .kpi::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+        }
+        .kpi-accent::after { background: var(--accent); }
+        .kpi-green::after { background: var(--green); }
+        .kpi-red::after { background: var(--red); }
+        .kpi-blue::after { background: var(--blue); }
+        .kpi-yellow::after { background: var(--yellow); }
+
+        .kpi-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .kpi-header i { font-size: 16px; color: var(--text-dim); }
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 500;
+        }
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 6px;
+            font-family: var(--mono);
+        }
+        .kpi-value.green { color: var(--green); }
+        .kpi-value.red { color: var(--red); }
+        .kpi-value.accent { color: var(--accent); }
+        .kpi-value.blue { color: var(--blue); }
+        .kpi-value.yellow { color: var(--yellow); }
+
+        /* ─── Sections ─── */
+        .section {
+            margin-bottom: 28px;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .section-header i { font-size: 18px; color: var(--accent); }
+        .section-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+
+        /* ─── Distribution Row ─── */
+        .dist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .dist-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+        .dist-card h3 {
+            font-size: 13px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 14px;
+            font-weight: 500;
+        }
+        .dist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+        }
+        .dist-item-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .dist-item-label i { font-size: 16px; }
+        .dist-item-value {
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .dist-bar {
+            height: 4px;
+            background: var(--surface-2);
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .dist-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: var(--accent);
+            transition: width 0.6s ease;
+        }
+
+        /* ─── Progress Bar ─── */
+        .progress-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 28px;
+        }
+        .progress-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .progress-label {
+            font-size: 13px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .progress-label i { font-size: 16px; }
+        .progress-count {
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .progress-bar {
+            height: 8px;
+            background: var(--surface-2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--accent), #a29bfe);
+            transition: width 0.8s ease;
+        }
+
+        /* ─── Table ─── */
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .table-scroll {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead {
+            background: var(--surface-2);
+        }
+        th {
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            white-space: nowrap;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: var(--surface-2); }
+
+        .sport-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .sport-futbol { background: var(--green-dim); color: var(--green); }
+        .sport-baloncesto { background: var(--blue-dim); color: var(--blue); }
+
+        .result-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .result-win { background: var(--green-dim); color: var(--green); }
+        .result-loss { background: var(--red-dim); color: var(--red); }
+        .result-push { background: var(--yellow-dim); color: var(--yellow); }
+        .result-pending { background: var(--surface-2); color: var(--text-dim); }
+
+        .mono { font-family: var(--mono); }
+        .dim { color: var(--text-dim); }
+        .pnl-pos { color: var(--green); }
+        .pnl-neg { color: var(--red); }
+
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 12px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .link-btn:hover { background: var(--accent-dim); }
+        .link-btn i { font-size: 14px; }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 768px) {
+            .container { padding: 16px 12px; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .kpi { padding: 14px; }
+            .kpi-value { font-size: 24px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .dist-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ─── Empty State ─── */
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+        .empty i { font-size: 40px; margin-bottom: 12px; display: block; }
+        .empty p { font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo"><i class="ph-bold ph-chart-line-up"></i></div>
+            <h1>Paradigma</h1>
+        </div>
+        <div class="header-right">
+            {% if stats.pending_count > 0 and stats.settled_count == 0 %}
+            <span class="badge badge-paper">Paper Trading</span>
+            {% else %}
+            <span class="badge badge-paper">Paper Trading</span>
+            {% endif %}
+            <span class="timestamp">
+                <i class="ph ph-clock"></i> {{ now }} CR
+            </span>
+        </div>
+    </div>
+
+    <!-- KPI Cards Row 1: Money -->
+    <div class="kpi-grid">
+        <div class="kpi kpi-accent">
+            <div class="kpi-header">
+                <i class="ph-bold ph-wallet"></i>
+                <span class="kpi-label">Bankroll</span>
+            </div>
+            <div class="kpi-value accent">${{ "%.2f"|format(stats.bankroll) }}</div>
+            <div class="kpi-sub">Inicial: ${{ "%.2f"|format(stats.initial_bankroll) }}</div>
+        </div>
+
+        <div class="kpi kpi-yellow">
+            <div class="kpi-header">
+                <i class="ph-bold ph-coins"></i>
+                <span class="kpi-label">En juego</span>
+            </div>
+            <div class="kpi-value yellow">${{ "%.2f"|format(stats.pending_staked) }}</div>
+            <div class="kpi-sub">{{ stats.pending_count }} apuestas abiertas</div>
+        </div>
+
+        <div class="kpi kpi-green">
+            <div class="kpi-header">
+                <i class="ph-bold ph-trend-up"></i>
+                <span class="kpi-label">Ganado</span>
+            </div>
+            <div class="kpi-value green">${{ "%.2f"|format(stats.total_won) }}</div>
+            <div class="kpi-sub">{{ stats.wins }} ganadas</div>
+        </div>
+
+        <div class="kpi kpi-red">
+            <div class="kpi-header">
+                <i class="ph-bold ph-trend-down"></i>
+                <span class="kpi-label">Perdido</span>
+            </div>
+            <div class="kpi-value red">${{ "%.2f"|format(stats.total_lost) }}</div>
+            <div class="kpi-sub">{{ stats.losses }} perdidas</div>
+        </div>
+
+        <div class="kpi kpi-blue">
+            <div class="kpi-header">
+                <i class="ph-bold ph-receipt"></i>
+                <span class="kpi-label">Total apostado</span>
+            </div>
+            <div class="kpi-value blue">${{ "%.2f"|format(stats.total_staked) }}</div>
+            <div class="kpi-sub">{{ stats.total_bets }} apuestas</div>
+        </div>
+    </div>
+
+    <!-- KPI Cards Row 2: Performance -->
+    <div class="kpi-grid">
+        <div class="kpi kpi-accent">
+            <div class="kpi-header">
+                <i class="ph-bold ph-percent"></i>
+                <span class="kpi-label">P&L neto</span>
+            </div>
+            <div class="kpi-value {% if stats.total_pnl >= 0 %}green{% else %}red{% endif %}">
+                {{ "+" if stats.total_pnl >= 0 else "" }}${{ "%.2f"|format(stats.total_pnl) }}
+            </div>
+            <div class="kpi-sub">ROI: {{ "%.1f"|format(stats.roi) }}%</div>
+        </div>
+
+        <div class="kpi kpi-green">
+            <div class="kpi-header">
+                <i class="ph-bold ph-target"></i>
+                <span class="kpi-label">Win rate</span>
+            </div>
+            <div class="kpi-value">{{ "%.0f"|format(stats.win_rate) }}%</div>
+            <div class="kpi-sub">{{ stats.wins }}W / {{ stats.losses }}L / {{ stats.pushes }}P</div>
+        </div>
+
+        <div class="kpi kpi-blue">
+            <div class="kpi-header">
+                <i class="ph-bold ph-chart-bar"></i>
+                <span class="kpi-label">EV promedio</span>
+            </div>
+            <div class="kpi-value">{{ "%.1f"|format(stats.avg_ev) }}%</div>
+            <div class="kpi-sub">Odds prom: {{ "%.2f"|format(stats.avg_odds) }}</div>
+        </div>
+
+        <div class="kpi kpi-yellow">
+            <div class="kpi-header">
+                <i class="ph-bold ph-calendar-blank"></i>
+                <span class="kpi-label">Apuestas / día</span>
+            </div>
+            <div class="kpi-value">{{ "%.1f"|format(stats.bets_per_day) }}</div>
+            <div class="kpi-sub">{{ stats.days_active }} días activo{{ 's' if stats.days_active != 1 }}</div>
+        </div>
+
+        {% if stats.avg_clv is not none %}
+        <div class="kpi kpi-accent">
+            <div class="kpi-header">
+                <i class="ph-bold ph-lightning"></i>
+                <span class="kpi-label">CLV promedio</span>
+            </div>
+            <div class="kpi-value {% if stats.avg_clv >= 0 %}green{% else %}red{% endif %}">
+                {{ "%.1f"|format(stats.avg_clv) }}%
+            </div>
+            <div class="kpi-sub">Closing Line Value</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Progress to validation -->
+    <div class="progress-section">
+        <div class="progress-top">
+            <span class="progress-label">
+                <i class="ph-bold ph-flag-checkered"></i>
+                Progreso validación (200 apuestas liquidadas)
+            </span>
+            <span class="progress-count">{{ stats.settled_count }} / 200</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (stats.settled_count / 200 * 100) | round(1) }}%"></div>
+        </div>
+    </div>
+
+    <!-- Distribution Cards -->
+    <div class="dist-grid">
+        <div class="dist-card">
+            <h3>Por deporte</h3>
+            {% for sport, count in stats.sport_counts.items() %}
+            <div>
+                <div class="dist-item">
+                    <span class="dist-item-label">
+                        {% if sport == "Fútbol" %}
+                        <i class="ph-fill ph-soccer-ball" style="color: var(--green)"></i>
+                        {% elif sport == "Baloncesto" %}
+                        <i class="ph-fill ph-basketball" style="color: var(--blue)"></i>
+                        {% else %}
+                        <i class="ph-fill ph-trophy" style="color: var(--yellow)"></i>
+                        {% endif %}
+                        {{ sport }}
+                    </span>
+                    <span class="dist-item-value">{{ count }}</span>
+                </div>
+                <div class="dist-bar">
+                    <div class="dist-bar-fill" style="width: {{ (count / stats.total_bets * 100) | round(1) }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="dist-card">
+            <h3>Por casa de apuestas</h3>
+            {% for book, count in stats.book_counts | dictsort(by='value', reverse=true) %}
+            <div>
+                <div class="dist-item">
+                    <span class="dist-item-label">
+                        <i class="ph ph-storefront" style="color: var(--accent)"></i>
+                        {{ book }}
+                    </span>
+                    <span class="dist-item-value">{{ count }}</span>
+                </div>
+                <div class="dist-bar">
+                    <div class="dist-bar-fill" style="width: {{ (count / stats.total_bets * 100) | round(1) }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bets Table -->
+    <div class="section">
+        <div class="section-header">
+            <i class="ph-bold ph-list-dashes"></i>
+            <h2>Todas las apuestas</h2>
+        </div>
+
+        {% if bets %}
+        <div class="table-wrap">
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Hora CR</th>
+                            <th>Deporte</th>
+                            <th>Partido</th>
+                            <th>Apuesta</th>
+                            <th>Casa</th>
+                            <th>Odds</th>
+                            <th>Pinnacle</th>
+                            <th>EV</th>
+                            <th>Kelly</th>
+                            <th>Stake</th>
+                            <th>Estado</th>
+                            <th>P&L</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bet in bets %}
+                        <tr>
+                            <td class="mono dim">{{ bet.id }}</td>
+                            <td class="mono">{{ bet.created_at_cr }}</td>
+                            <td>
+                                <span class="sport-badge sport-{{ bet.sport_type | lower }}">
+                                    {% if bet.sport_type == "Fútbol" %}
+                                    <i class="ph-fill ph-soccer-ball"></i>
+                                    {% elif bet.sport_type == "Baloncesto" %}
+                                    <i class="ph-fill ph-basketball"></i>
+                                    {% endif %}
+                                    {{ bet.sport_type }}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>{{ bet.home_team }}</strong>
+                                <span class="dim">vs</span>
+                                <strong>{{ bet.away_team }}</strong>
+                            </td>
+                            <td>{{ bet.outcome_display }} <span class="dim">({{ bet.market }})</span></td>
+                            <td>{{ bet.book_title }}</td>
+                            <td class="mono">{{ "%.2f"|format(bet.odds_at_bet) }}</td>
+                            <td class="mono dim">{{ "%.2f"|format(bet.pinnacle_odds_at_bet) if bet.pinnacle_odds_at_bet else "—" }}</td>
+                            <td class="mono" style="color: var(--green)">+{{ "%.1f"|format(bet.ev_percent) }}%</td>
+                            <td class="mono">{{ "%.2f"|format(bet.kelly_stake_percent) }}%</td>
+                            <td class="mono">${{ "%.2f"|format(bet.stake) }}</td>
+                            <td><span class="result-badge result-{{ bet.result_class }}">{{ bet.result_display }}</span></td>
+                            <td class="mono {% if bet.pnl is not none and bet.pnl >= 0 %}pnl-pos{% elif bet.pnl is not none %}pnl-neg{% else %}dim{% endif %}">
+                                {{ bet.pnl_display }}
+                            </td>
+                            <td>
+                                {% if bet.bookmaker_link %}
+                                <a href="{{ bet.bookmaker_link }}" target="_blank" class="link-btn">
+                                    <i class="ph-bold ph-arrow-square-out"></i>
+                                </a>
+                                {% else %}
+                                <span class="dim">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="table-wrap">
+            <div class="empty">
+                <i class="ph ph-hourglass-medium"></i>
+                <p>No hay apuestas registradas aún</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    // Auto-refresh every 5 minutes
+    setTimeout(() => location.reload(), 5 * 60 * 1000);
+</script>
+
+</body>
+</html>
