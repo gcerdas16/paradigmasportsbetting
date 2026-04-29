@@ -1272,3 +1272,65 @@ logger.info(f"  Links totales: {total}, /futbol/: {futbol}, /football/: {footbal
 ```
 
 **Debug:** `scraping_debug/betsafe_betsson_20260428_053959.json`
+
+---
+
+### 2026-04-28 18:53 — BetSafe v7: selector bilingüe /futbol/ + /football/ — sigue 0 ligas
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~1 min
+**Exit code:** 0
+
+**Output:**
+```
+Links: /futbol/=21, /football/=0
+Encontradas 0 ligas en el menú
+BetSafe: 1 evento con odds
+
+  Cerro Porteño vs Palmeiras → Copa Libertadores → Palmeiras: 1.9800 (solo 1 sel)
+```
+
+**Diagnóstico definitivo — causa raíz encontrada:**
+
+El log de diagnóstico revela: **21 links con `/futbol/` son encontrados, pero TODOS tienen 2+ segmentos** → el filtro de 1 segmento los elimina todos.
+
+```
+Los 21 links son de partidos individuales (estructura):
+  /es/apuestas-deportivas/futbol/copa-libertadores/cerro-porteno-palmeiras
+  /es/apuestas-deportivas/futbol/champions-league/atletico-madrid-arsenal
+  /es/apuestas-deportivas/futbol/premier-league/xxx-yyy
+  → todos tienen 2 segmentos tras /futbol/: liga + partido → filtrados
+
+Links de liga (1 segmento) como /futbol/champions-league → NO existen en liveAndUpcoming
+```
+
+**La página `liveAndUpcoming` solo tiene links de partidos individuales**, no links de ligas. Los links de liga de 1 segmento están en el **sidebar de navegación izquierdo**, NO en las cards de partidos.
+
+**Hipótesis sobre v5:** En v5 funcionó porque no había filtro de 1 segmento — se navegaba a páginas de partidos individuales (como `paris-sg-bayern-de-munich`) y eso SÍ disparaba `events-table/v2` para la liga completa de esa página. El filtro de v6/v7 rompió eso.
+
+**Fix recomendado — dos opciones:**
+
+**Opción A (más simple — revertir filtro y usar clase CSS):**
+```python
+# En vez de filtrar por segmentos de URL, filtrar por clase CSS del sidebar
+# Los links del sidebar tienen clases distintas a los links de cards de partidos
+# Ejemplo: 'nav a[href*="/futbol/"]' o '.sidebar a[href*="/futbol/"]'
+# Pero primero confirmar qué clase tienen con DevTools en BetSafe
+```
+
+**Opción B (más robusta — navegación por la API de categorías):**
+```python
+# La respuesta categories/v2 (4162KB ya interceptada) contiene el árbol de categorías
+# con IDs de competiciones. Extraer los competitionIds de ahí y construir URLs:
+# /es/apuestas-deportivas/futbol?competitionId=XXXX
+# O llamar events-table/v2 directamente con esos IDs (sin Playwright navigation)
+```
+
+**Opción C (más rápida — quitar filtro de 1 segmento y navegar a partidos):**
+```python
+# Revertir al approach de v5: navegar a links de PARTIDOS de UCL/EPL/La Liga
+# Al navegar a un partido individual de UCL, events-table/v2 carga TODA la liga UCL
+# Esto es lo que funcionó en v5 (aunque inadvertidamente)
+```
+
+**Debug:** `scraping_debug/betsafe_betsson_20260429_005358.json`
