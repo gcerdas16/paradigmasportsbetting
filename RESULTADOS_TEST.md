@@ -76,6 +76,35 @@ for league_url in self.LEAGUE_URLS:
 
 ---
 
+### 2026-04-28 21:08 — BetSafe v11 — URLs correctas ✅ pero events-table no dispara (falta scroll)
+
+**Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
+**Duración:** ~2.5 min / **Exit code:** 0
+
+**Output:** 1 evento (Cerro Porteño). URLs ahora son correctas (el log lo confirma):
+```
+→ england-premier-league: https://www.betsafe.com/en/sportsbook/football/england/england-premier-league ✅
+→ spain-la-liga:          https://www.betsafe.com/en/sportsbook/football/spain/spain-la-liga            ✅
+→ champions-league:       https://www.betsafe.com/en/sportsbook/football/champions-league/champions-league ✅
+...etc (todas correctas)
+events-table no disparó para: ninguna de las 7 ligas
+```
+
+**Diagnóstico:** `domcontentloaded` carga el DOM pero events-table/v2 se activa por scroll (lazy loading). En v9 funcionó porque hacía 3 scrolls después de cada navegación. V11 usa `expect_response` con timeout de 15s pero nunca hace scroll → events-table nunca se activa.
+
+**Fix:** Agregar scrolls después de `domcontentloaded`:
+```python
+page.goto(league_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+page.wait_for_timeout(2_000)
+for _ in range(3):                                          # ← esto falta en v11
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    page.wait_for_timeout(1_500)
+```
+
+**Debug:** `scraping_debug/betsafe_betsson_20260429_031053.json`
+
+---
+
 ### 2026-04-28 20:59 — BetSafe v10b — mismo resultado (1 evento), bugs sin corregir
 
 **Comando:** `cd paradigma && python3 -m scraping.kambi_scraper --book betsafe --no-headless`
