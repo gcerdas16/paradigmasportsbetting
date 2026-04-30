@@ -40,13 +40,20 @@ class ResultSettler:
             if bet.sport_key:
                 sports_needed.add(bet.sport_key)
 
+        logger.info(f"Deportes con apuestas pendientes: {sports_needed}")
+
         # Obtener scores de cada deporte
         all_scores = {}
         for sport in sports_needed:
-            scores = self.client.get_scores(sport, days_from=3)
-            for game in scores:
-                if game.get("completed"):
-                    all_scores[game["id"]] = game
+            try:
+                scores = self.client.get_scores(sport, days_from=3)
+                logger.info(f"  {sport}: API devolvió {len(scores)} juegos")
+                for game in scores:
+                    if game.get("completed"):
+                        all_scores[game["id"]] = game
+                        logger.info(f"    ✓ {game['home_team']} vs {game['away_team']} (id={game['id'][:12]}...) COMPLETADO")
+            except Exception as e:
+                logger.error(f"  Error obteniendo scores para {sport}: {e}")
 
         logger.info(
             f"Scores obtenidos: {len(all_scores)} partidos completados "
@@ -56,6 +63,12 @@ class ResultSettler:
         # Intentar liquidar cada apuesta pendiente
         results = {"win": 0, "loss": 0, "push": 0, "not_found": 0}
 
+        # Log event_ids para debug
+        pending_event_ids = set(b.event_id for b in pending)
+        score_event_ids = set(all_scores.keys())
+        matched = pending_event_ids & score_event_ids
+        logger.info(f"Event IDs pendientes: {len(pending_event_ids)} | Scores: {len(score_event_ids)} | Match: {len(matched)}")
+
         for bet in pending:
             if bet.event_id not in all_scores:
                 results["not_found"] += 1
@@ -63,6 +76,7 @@ class ResultSettler:
 
             game = all_scores[bet.event_id]
             result = self._determine_result(bet, game)
+            logger.info(f"  Apuesta #{bet.id} ({bet.outcome_name}): {result} | scores={game.get('scores')}")
 
             if result is None:
                 results["not_found"] += 1
