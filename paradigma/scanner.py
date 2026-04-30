@@ -46,7 +46,15 @@ class ValueScanner:
         logger.info(f"Escaneo iniciado: {datetime.now(timezone.utc).isoformat()}")
         logger.info("=" * 60)
 
-        # Verificar stop-loss
+        # 0. SIEMPRE intentar liquidar apuestas pendientes primero
+        try:
+            settle_result = self.settler.settle_pending()
+            if settle_result.get("settled", 0) > 0:
+                logger.info(f"Auto-liquidación: {settle_result}")
+        except Exception as e:
+            logger.warning(f"Error en auto-liquidación: {e}")
+
+        # Verificar stop-loss (después de liquidar para tener bankroll real)
         if self.tracker.check_stop_loss():
             self.notifier.send_stop_loss(self.tracker.bankroll)
             return []
@@ -58,13 +66,6 @@ class ValueScanner:
         if daily_full or total_full:
             reason = "diario" if daily_full else "total"
             logger.info(f"Límite {reason} alcanzado. Saltando escaneo de odds (ahorrando API calls).")
-            # Aún intentar liquidar apuestas pendientes (libera espacio)
-            try:
-                settle_result = self.settler.settle_pending()
-                if settle_result.get("settled", 0) > 0:
-                    logger.info(f"Auto-liquidación: {settle_result}")
-            except Exception as e:
-                logger.warning(f"Error en auto-liquidación: {e}")
             return []
 
         # 0. Scouting gratuito (no gasta quota)
@@ -154,13 +155,7 @@ class ValueScanner:
         if self.client.remaining_requests is not None:
             logger.info(f"API requests restantes: {self.client.remaining_requests}")
 
-        # 5. Auto-liquidar apuestas completadas
-        try:
-            settle_result = self.settler.settle_pending()
-            if settle_result.get("settled", 0) > 0:
-                logger.info(f"Auto-liquidación: {settle_result}")
-        except Exception as e:
-            logger.warning(f"Error en auto-liquidación: {e}")
+        # 5. Liquidación ya se hizo al inicio del ciclo
 
         return value_bets
 

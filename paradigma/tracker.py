@@ -388,19 +388,31 @@ class Tracker:
     def check_stop_loss(self) -> bool:
         """
         Verifica si se activó el stop-loss semanal.
+        Solo cuenta pérdidas REALES (apuestas liquidadas), no stakes pendientes.
         Retorna True si hay que pausar.
         """
-        stats = self.get_stats()
-        initial = config.INITIAL_BANKROLL
-        current = stats["bankroll"]
-        loss_pct = (1 - current / initial) * 100
+        session = self.Session()
+        try:
+            # Solo contar PnL de apuestas ya liquidadas
+            settled = session.query(Bet).filter(Bet.result.isnot(None)).all()
+            realized_pnl = sum(b.pnl or 0 for b in settled)
+            initial = config.INITIAL_BANKROLL
+            realized_bankroll = initial + realized_pnl
+            loss_pct = (1 - realized_bankroll / initial) * 100
 
-        if loss_pct >= config.STOP_LOSS_WEEKLY_PERCENT:
-            logger.warning(
-                f"⚠️ STOP-LOSS ACTIVADO. "
-                f"Pérdida: {loss_pct:.1f}% "
-                f"(umbral: {config.STOP_LOSS_WEEKLY_PERCENT}%). "
-                f"PAUSAR OPERACIONES."
+            if loss_pct >= config.STOP_LOSS_WEEKLY_PERCENT:
+                logger.warning(
+                    f"⚠️ STOP-LOSS ACTIVADO. "
+                    f"Pérdida realizada: {loss_pct:.1f}% "
+                    f"(umbral: {config.STOP_LOSS_WEEKLY_PERCENT}%). "
+                    f"PAUSAR OPERACIONES."
+                )
+                return True
+
+            logger.info(
+                f"Stop-loss check: PnL realizado=${realized_pnl:.2f}, "
+                f"pérdida={loss_pct:.1f}% (umbral={config.STOP_LOSS_WEEKLY_PERCENT}%)"
             )
-            return True
-        return False
+            return False
+        finally:
+            session.close()
