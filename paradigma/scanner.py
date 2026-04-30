@@ -1,6 +1,6 @@
 """
-Scanner principal: busca value bets periódicamente.
-Orquesta odds_client -> ev_calculator -> tracker -> telegram.
+Scanner principal: busca value bets y arbitraje periódicamente.
+Orquesta odds_client -> ev_calculator -> arb_finder -> tracker -> telegram.
 Incluye: scouting gratuito, tracking de frescura, auto-liquidación.
 """
 
@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import config
 from odds_client import OddsClient
 from ev_calculator import find_value_bets
+from arb_finder import find_arb_opportunities
 from tracker import Tracker
 from telegram_bot import TelegramNotifier
 from odds_history import OddsHistory
@@ -28,7 +29,6 @@ class ValueScanner:
         self.notifier = TelegramNotifier()
         self.history = OddsHistory(max_snapshots=10)
         self.settler = ResultSettler(self.client, self.tracker)
-        self._seen_bets: set[str] = set()  # Evitar duplicados
 
     def scan_once(self) -> list:
         """
@@ -110,30 +110,29 @@ class ValueScanner:
         # 3. Encontrar value bets
         value_bets = find_value_bets(soft_odds, pinnacle_data)
 
-        # 3b. Deduplicar: solo la mejor odd por evento+mercado+outcome
-        best_per_outcome: dict[str, object] = {}
+        # 3b. Deduplicar: solo la mejor EV por EVENTO (1 apuesta por partido)
+        best_per_event: dict[str, object] = {}
         for vb in value_bets:
-            outcome_key = f"{vb.event_id}|{vb.market}|{vb.outcome_name}|{vb.outcome_point}"
-            if outcome_key not in best_per_outcome or vb.odds > best_per_outcome[outcome_key].odds:
-                best_per_outcome[outcome_key] = vb
-        value_bets = list(best_per_outcome.values())
+            eid = vb.event_id
+            if eid not in best_per_event or vb.ev_percent > best_per_event[eid].ev_percent:
+                best_per_event[eid] = vb
+        value_bets = list(best_per_event.values())
         value_bets.sort(key=lambda x: x.ev_percent, reverse=True)
 
-        logger.info(f"Value bets únicas (mejor odd por outcome): {len(value_bets)}")
+        logger.info(f"Value bets únicas (mejor EV por evento): {len(value_bets)}")
 
         # 4. Procesar cada value bet
         new_bets = []
         for vb in value_bets:
-            # Deduplicar entre escaneos
-            bet_key = f"{vb.event_id}|{vb.market}|{vb.outcome_name}|{vb.outcome_point}"
-            if bet_key in self._seen_bets:
+            # Deduplicar contra DB (persistente entre reinicios)
+            if self.tracker.has_pending_bet_for_event(vb.event_id):
+                logger.info(f"SKIP (ya existe en DB): {vb.display_name}")
                 continue
-            self._seen_bets.add(bet_key)
 
             # Registrar apuesta
             bet = self.tracker.place_bet(vb)
             if bet is None:
-                continue  # Exposición diaria excedida
+                continue  # Exposición excedida
 
             new_bets.append(vb)
 
@@ -155,7 +154,33 @@ class ValueScanner:
         if self.client.remaining_requests is not None:
             logger.info(f"API requests restantes: {self.client.remaining_requests}")
 
-        # 5. Liquidación ya se hizo al inicio del ciclo
+        # 5. Buscar arbitraje (usa los mismos eventos, no gasta API extra)
+        arb_opps = find_arb_opportunities(events)
+        new_arbs = []
+        for arb in arb_opps:
+            # Deduplicar contra DB
+            if self.tracker.has_pending_bet_for_event(arb.event_id):
+                logger.info(f"ARB SKIP (ya existe en DB): {arb.display_name}")
+                continue
+
+            # Stake: 2% del bankroll por arb (fijo, no Kelly)
+            arb_stake = self.tracker.bankroll * 0.02
+            bets = self.tracker.place_arb(arb, arb_stake)
+            if bets:
+                new_arbs.append(arb)
+                self.notifier.send_message(
+                    f"💰 *ARBITRAJE DETECTADO*\n"
+                    f"{arb.display_name}\n"
+                    f"Mercado: {arb.market}\n"
+                    f"Ganancia: +{arb.profit_percent:.2f}%\n"
+                    f"{arb.display_arb}\n"
+                    f"Stake total: ${arb_stake:.2f}"
+                )
+
+        logger.info(
+            f"Arbitraje: {len(arb_opps)} oportunidades | "
+            f"{len(new_arbs)} nuevas registradas"
+        )
 
         return value_bets
 

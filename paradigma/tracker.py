@@ -74,6 +74,9 @@ class Bet(Base):
 
     # Metadata
     is_paper = Column(Boolean, default=True)
+    bet_type = Column(String(16), default="value")  # "value" o "arb"
+    arb_group_id = Column(String(64), nullable=True)  # Agrupa patas del mismo arb
+    arb_profit_percent = Column(Float, nullable=True)  # % ganancia garantizada del arb
     notes = Column(Text, nullable=True)
 
 
@@ -231,6 +234,87 @@ class Tracker:
         finally:
             session.close()
 
+    def place_arb(self, arb, total_stake: float) -> list[Bet]:
+        """
+        Registra todas las patas de un arbitraje.
+
+        Args:
+            arb: ArbOpportunity detectada.
+            total_stake: Monto total a distribuir entre las patas.
+
+        Returns:
+            Lista de Bets registradas.
+        """
+        import uuid
+        arb_group_id = str(uuid.uuid4())[:8]
+        session = self.Session()
+        bets = []
+        try:
+            current_bankroll = self.bankroll
+
+            # Verificar exposición total
+            total_exposure = self._get_total_exposure(session)
+            max_total = current_bankroll * (config.MAX_TOTAL_EXPOSURE / 100.0)
+            if total_exposure + total_stake > max_total:
+                logger.warning(
+                    f"ARB: Tope total excedido. "
+                    f"Abierto: ${total_exposure:.2f}, "
+                    f"Stake total: ${total_stake:.2f}, "
+                    f"Máx: ${max_total:.2f}. ARB OMITIDO."
+                )
+                return []
+
+            for leg in arb.legs:
+                leg_stake = round(total_stake * leg.stake_fraction, 2)
+
+                bet = Bet(
+                    event_id=arb.event_id,
+                    sport_key=arb.sport_key,
+                    sport_title=arb.sport_title,
+                    commence_time=arb.commence_time,
+                    home_team=arb.home_team,
+                    away_team=arb.away_team,
+                    book_key=leg.book_key,
+                    book_title=leg.book_title,
+                    market=arb.market,
+                    outcome_name=leg.outcome_name,
+                    outcome_point=leg.outcome_point,
+                    odds_at_bet=leg.odds,
+                    fair_prob=None,
+                    ev_percent=arb.profit_percent,
+                    kelly_fraction=None,
+                    kelly_stake_percent=None,
+                    pinnacle_odds_at_bet=None,
+                    bookmaker_link=leg.book_link,
+                    stake=leg_stake,
+                    bankroll_before=current_bankroll,
+                    is_paper=config.PAPER_TRADING,
+                    bet_type="arb",
+                    arb_group_id=arb_group_id,
+                    arb_profit_percent=arb.profit_percent,
+                )
+                session.add(bet)
+                bets.append(bet)
+
+            session.commit()
+            for b in bets:
+                session.refresh(b)
+
+            total_staked = sum(b.stake for b in bets)
+            self._bankroll = current_bankroll - total_staked
+
+            logger.info(
+                f"{'📝 PAPER' if config.PAPER_TRADING else '💰 REAL'} ARB #{arb_group_id}: "
+                f"{arb.display_name} | {arb.market} | "
+                f"+{arb.profit_percent:.2f}% garantizado | "
+                f"Total: ${total_staked:.2f} | "
+                f"{len(bets)} patas"
+            )
+            return bets
+
+        finally:
+            session.close()
+
     def settle_bet(
         self,
         bet_id: int,
@@ -335,6 +419,19 @@ class Tracker:
                 "bets_to_validate": max(0, config.MIN_BETS_TO_VALIDATE - len(settled)),
             }
 
+        finally:
+            session.close()
+
+    def has_pending_bet_for_event(self, event_id: str) -> bool:
+        """Verifica si ya existe una apuesta pendiente para este evento."""
+        session = self.Session()
+        try:
+            count = (
+                session.query(Bet)
+                .filter(Bet.event_id == event_id, Bet.result.is_(None))
+                .count()
+            )
+            return count > 0
         finally:
             session.close()
 
