@@ -447,42 +447,127 @@ class Tracker:
         finally:
             session.close()
 
-    def _get_daily_exposure(self, session) -> float:
-        """Calcula cuánto se apostó HOY (por fecha de creación)."""
+    def _get_daily_exposure(self, session, bet_type: str = None) -> float:
+        """Calcula cuánto se apostó HOY (por fecha de creación), filtrado por tipo."""
         today = datetime.now(timezone.utc).date()
-        bets_today = (
-            session.query(Bet)
-            .filter(Bet.created_at >= datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc))
-            .all()
+        q = session.query(Bet).filter(
+            Bet.created_at >= datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
         )
+        if bet_type:
+            q = q.filter(Bet.bet_type == bet_type)
+        bets_today = q.all()
         return sum(b.stake for b in bets_today if b.stake)
 
-    def _get_total_exposure(self, session) -> float:
-        """Calcula el total abierto (todas las apuestas sin resultado)."""
-        pending = (
-            session.query(Bet)
-            .filter(Bet.result.is_(None))
-            .all()
-        )
+    def _get_total_exposure(self, session, bet_type: str = None) -> float:
+        """Calcula el total abierto (apuestas sin resultado), filtrado por tipo."""
+        q = session.query(Bet).filter(Bet.result.is_(None))
+        if bet_type:
+            q = q.filter(Bet.bet_type == bet_type)
+        pending = q.all()
         return sum(b.stake for b in pending if b.stake)
 
-    def is_daily_limit_reached(self) -> bool:
-        """Verifica si el límite diario ya se alcanzó."""
+    def is_daily_limit_reached(self, bet_type: str = "value") -> bool:
+        """
+        Verifica si el límite diario ya se alcanzó para el tipo dado.
+        Arb no tiene límite diario → siempre retorna False.
+        """
+        if bet_type == "arb":
+            return False  # Arb sin límite diario (es sin riesgo)
         session = self.Session()
         try:
-            daily_exposure = self._get_daily_exposure(session)
-            max_daily = self.bankroll * (config.MAX_DAILY_EXPOSURE / 100.0)
+            daily_exposure = self._get_daily_exposure(session, bet_type="value")
+            max_daily = self.bankroll * (config.MAX_DAILY_EXPOSURE_VALUE / 100.0)
             return daily_exposure >= max_daily
         finally:
             session.close()
 
-    def is_total_limit_reached(self) -> bool:
-        """Verifica si el tope total de exposición ya se alcanzó."""
+    def is_total_limit_reached(self, bet_type: str = None) -> bool:
+        """
+        Verifica si el tope total de exposición ya se alcanzó.
+        Usa límites separados: VALUE=30%, ARB=30%.
+        Si bet_type es None, verifica el global (cualquier tipo).
+        """
         session = self.Session()
         try:
-            total_exposure = self._get_total_exposure(session)
-            max_total = self.bankroll * (config.MAX_TOTAL_EXPOSURE / 100.0)
+            if bet_type == "value":
+                total_exposure = self._get_total_exposure(session, bet_type="value")
+                max_total = self.bankroll * (config.MAX_TOTAL_EXPOSURE_VALUE / 100.0)
+            elif bet_type == "arb":
+                total_exposure = self._get_total_exposure(session, bet_type="arb")
+                max_total = self.bankroll * (config.MAX_TOTAL_EXPOSURE_ARB / 100.0)
+            else:
+                total_exposure = self._get_total_exposure(session)
+                max_total = self.bankroll * (config.MAX_TOTAL_EXPOSURE / 100.0)
             return total_exposure >= max_total
+        finally:
+            session.close()
+
+    def get_exposure_details(self) -> dict:
+        """
+        Retorna detalles de exposición para el dashboard.
+        Incluye datos separados por estrategia.
+        """
+        session = self.Session()
+        try:
+            daily_value = self._get_daily_exposure(session, bet_type="value")
+            daily_arb = self._get_daily_exposure(session, bet_type="arb")
+            total_value = self._get_total_exposure(session, bet_type="value")
+            total_arb = self._get_total_exposure(session, bet_type="arb")
+
+            max_daily_value = self.bankroll * (config.MAX_DAILY_EXPOSURE_VALUE / 100.0)
+            max_total_value = self.bankroll * (config.MAX_TOTAL_EXPOSURE_VALUE / 100.0)
+            max_total_arb = self.bankroll * (config.MAX_TOTAL_EXPOSURE_ARB / 100.0)
+
+            # Stop-loss info
+            settled = session.query(Bet).filter(Bet.result.isnot(None)).all()
+            realized_pnl = sum(b.pnl or 0 for b in settled)
+            realized_bankroll = config.INITIAL_BANKROLL + realized_pnl
+            loss_pct = (1 - realized_bankroll / config.INITIAL_BANKROLL) * 100
+
+            # Today's bets breakdown
+            from datetime import date as date_type
+            today = datetime.now(timezone.utc).date()
+            today_bets = session.query(Bet).filter(
+                Bet.created_at >= datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+            ).all()
+
+            return {
+                "value": {
+                    "daily_used": round(daily_value, 2),
+                    "daily_limit": round(max_daily_value, 2),
+                    "daily_pct": round(daily_value / max_daily_value * 100, 1) if max_daily_value > 0 else 0,
+                    "total_used": round(total_value, 2),
+                    "total_limit": round(max_total_value, 2),
+                    "total_pct": round(total_value / max_total_value * 100, 1) if max_total_value > 0 else 0,
+                },
+                "arb": {
+                    "daily_used": round(daily_arb, 2),
+                    "daily_limit": None,  # Sin límite diario
+                    "daily_pct": None,
+                    "total_used": round(total_arb, 2),
+                    "total_limit": round(max_total_arb, 2),
+                    "total_pct": round(total_arb / max_total_arb * 100, 1) if max_total_arb > 0 else 0,
+                },
+                "stop_loss": {
+                    "realized_pnl": round(realized_pnl, 2),
+                    "realized_bankroll": round(realized_bankroll, 2),
+                    "loss_pct": round(loss_pct, 1),
+                    "threshold": config.STOP_LOSS_WEEKLY_PERCENT,
+                    "is_active": loss_pct >= config.STOP_LOSS_WEEKLY_PERCENT,
+                },
+                "today_bets": [
+                    {
+                        "id": b.id,
+                        "event": f"{b.home_team} vs {b.away_team}",
+                        "bet_type": b.bet_type or "value",
+                        "stake": round(b.stake, 2) if b.stake else 0,
+                        "outcome": b.outcome_name,
+                        "book": b.book_title,
+                    }
+                    for b in today_bets
+                ],
+                "bankroll": round(self.bankroll, 2),
+            }
         finally:
             session.close()
 

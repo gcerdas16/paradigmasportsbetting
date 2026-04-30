@@ -5,6 +5,7 @@ Incluye: scouting gratuito, tracking de frescura, auto-liquidación.
 """
 
 import logging
+import os
 import time
 from datetime import datetime, timezone
 
@@ -59,24 +60,49 @@ class ValueScanner:
             self.notifier.send_stop_loss(self.tracker.bankroll)
             return []
 
-        # Verificar límites ANTES de gastar API calls
-        daily_full = self.tracker.is_daily_limit_reached()
-        total_full = self.tracker.is_total_limit_reached()
+        # Verificar límites por estrategia ANTES de gastar API calls
+        value_daily_full = self.tracker.is_daily_limit_reached(bet_type="value")
+        value_total_full = self.tracker.is_total_limit_reached(bet_type="value")
+        arb_total_full = self.tracker.is_total_limit_reached(bet_type="arb")
+        skip_value = value_daily_full or value_total_full
+        skip_arb = arb_total_full
 
-        if daily_full or total_full:
-            reason = "diario" if daily_full else "total"
-            logger.info(f"Límite {reason} alcanzado. Saltando escaneo de odds (ahorrando API calls).")
+        if skip_value:
+            reason = "diario" if value_daily_full else "total"
+            logger.info(f"Value: límite {reason} alcanzado. Saltando value bets.")
+        if skip_arb:
+            logger.info("Arb: límite total alcanzado. Saltando arbs.")
+
+        # Si AMBOS están llenos, no gastar API calls
+        if skip_value and skip_arb:
+            logger.info("Ambos límites alcanzados. Saltando escaneo completo (ahorrando API calls).")
             return []
 
         # 0. Scouting gratuito (no gasta quota)
         total_events_available = 0
+        scout_data = {}
         for sport in config.SPORTS:
             try:
                 sport_events = self.client.get_events(sport)
                 total_events_available += len(sport_events)
+                if sport_events:
+                    scout_data[sport] = sport_events
             except Exception:
                 pass
         logger.info(f"Scouting: {total_events_available} eventos disponibles (gratis)")
+
+        # Guardar scouting para el dashboard Events
+        try:
+            import json
+            scout_file = os.path.join(os.path.dirname(__file__), "last_scout.json")
+            with open(scout_file, "w") as f:
+                json.dump({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "sports": scout_data,
+                    "total": total_events_available,
+                }, f, default=str)
+        except Exception as e:
+            logger.debug(f"No se pudo guardar scouting: {e}")
 
         if total_events_available == 0:
             logger.warning("No hay eventos disponibles en ningún deporte.")
@@ -107,41 +133,45 @@ class ValueScanner:
             )
             return []
 
-        # 3. Encontrar value bets
-        value_bets = find_value_bets(soft_odds, pinnacle_data)
-
-        # 3b. Deduplicar: solo la mejor EV por EVENTO (1 apuesta por partido)
-        best_per_event: dict[str, object] = {}
-        for vb in value_bets:
-            eid = vb.event_id
-            if eid not in best_per_event or vb.ev_percent > best_per_event[eid].ev_percent:
-                best_per_event[eid] = vb
-        value_bets = list(best_per_event.values())
-        value_bets.sort(key=lambda x: x.ev_percent, reverse=True)
-
-        logger.info(f"Value bets únicas (mejor EV por evento): {len(value_bets)}")
-
-        # 4. Procesar cada value bet
+        # 3. Encontrar value bets (solo si no está lleno)
         new_bets = []
-        for vb in value_bets:
-            # Deduplicar contra DB (persistente entre reinicios)
-            if self.tracker.has_pending_bet_for_event(vb.event_id):
-                logger.info(f"SKIP (ya existe en DB): {vb.display_name}")
-                continue
+        value_bets = []
+        if not skip_value:
+            value_bets = find_value_bets(soft_odds, pinnacle_data)
 
-            # Registrar apuesta
-            bet = self.tracker.place_bet(vb)
-            if bet is None:
-                continue  # Exposición excedida
+            # 3b. Deduplicar: solo la mejor EV por EVENTO (1 apuesta por partido)
+            best_per_event: dict[str, object] = {}
+            for vb in value_bets:
+                eid = vb.event_id
+                if eid not in best_per_event or vb.ev_percent > best_per_event[eid].ev_percent:
+                    best_per_event[eid] = vb
+            value_bets = list(best_per_event.values())
+            value_bets.sort(key=lambda x: x.ev_percent, reverse=True)
 
-            new_bets.append(vb)
+            logger.info(f"Value bets únicas (mejor EV por evento): {len(value_bets)}")
 
-            # Enviar alerta
-            self.notifier.send_value_bet(
-                vb,
-                stake=bet.stake,
-                bankroll=self.tracker.bankroll,
-            )
+            # 4. Procesar cada value bet
+            for vb in value_bets:
+                # Deduplicar contra DB (persistente entre reinicios)
+                if self.tracker.has_pending_bet_for_event(vb.event_id):
+                    logger.info(f"SKIP (ya existe en DB): {vb.display_name}")
+                    continue
+
+                # Registrar apuesta
+                bet = self.tracker.place_bet(vb)
+                if bet is None:
+                    continue  # Exposición excedida
+
+                new_bets.append(vb)
+
+                # Enviar alerta
+                self.notifier.send_value_bet(
+                    vb,
+                    stake=bet.stake,
+                    bankroll=self.tracker.bankroll,
+                )
+        else:
+            logger.info("Value bets: saltado (límite alcanzado)")
 
         # Resumen del escaneo
         logger.info(
@@ -153,10 +183,18 @@ class ValueScanner:
 
         if self.client.remaining_requests is not None:
             logger.info(f"API requests restantes: {self.client.remaining_requests}")
+            # Guardar para el dashboard API page
+            os.environ["ODDS_API_REMAINING"] = str(self.client.remaining_requests)
+        if self.client.used_requests is not None:
+            os.environ["ODDS_API_USED"] = str(self.client.used_requests)
 
         # 5. Buscar arbitraje (usa los mismos eventos, no gasta API extra)
-        arb_opps = find_arb_opportunities(events)
         new_arbs = []
+        arb_opps = []
+        if not skip_arb:
+            arb_opps = find_arb_opportunities(events)
+        else:
+            logger.info("Arbitraje: saltado (límite total alcanzado)")
         for arb in arb_opps:
             # Deduplicar contra DB
             if self.tracker.has_pending_bet_for_event(arb.event_id):
