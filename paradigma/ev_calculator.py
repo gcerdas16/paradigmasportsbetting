@@ -6,7 +6,7 @@ para encontrar value bets (EV > 0).
 """
 
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Optional
 
@@ -36,6 +36,8 @@ class ValueBet:
     kelly_fraction: float
     kelly_stake_percent: float
     pinnacle_odds: Optional[float] = None     # Odds de Pinnacle al momento de detectar
+    avg_ev_percent: Optional[float] = None    # EV% vs consenso de mercado (señal secundaria)
+    num_books: int = 0                        # Casas que ofrecen este outcome
     book_link: Optional[str] = None           # Link directo al bookmaker (de la API)
     market_link: Optional[str] = None         # Link directo al mercado
     outcome_link: Optional[str] = None        # Link directo al betslip
@@ -65,6 +67,10 @@ def find_value_bets(
     """
     Encuentra value bets comparando odds de casas blandas con Pinnacle.
 
+    Mejoras inspiradas en oddsapi_ev:
+    - Filtro min_num_books: solo apuesta cuando N+ casas ofrecen el outcome
+    - avg_ev: calcula EV vs consenso de mercado como señal secundaria
+
     Args:
         soft_book_odds: Lista de odds individuales de casas blandas
                         (output de OddsClient.extract_soft_book_odds)
@@ -83,7 +89,17 @@ def find_value_bets(
         key = (row["event_id"], row["book_key"], row["market"])
         soft_outcome_counts[key] += 1
 
+    # Pre-calcular: cuántas casas ofrecen cada outcome (para filtro min_books)
+    # y odds promedio del mercado (para avg_ev)
+    outcome_books_count: Counter = Counter()
+    outcome_odds_sum: dict[tuple, float] = defaultdict(float)
+    for row in soft_book_odds:
+        okey = (row["event_id"], row["market"], row["outcome_name"], row.get("outcome_point"))
+        outcome_books_count[okey] += 1
+        outcome_odds_sum[okey] += row["odds"]
+
     market_mismatch_count = 0
+    low_books_count = 0
 
     for row in soft_book_odds:
         event_id = row["event_id"]
@@ -113,6 +129,14 @@ def find_value_bets(
                 continue
 
         outcome_key = (outcome_name, outcome_point)
+
+        # Filtro min_num_books: solo confiar cuando N+ casas ofrecen este outcome
+        # (inspirado por oddsapi_ev — más casas = pricing más confiable)
+        okey = (event_id, market, outcome_name, outcome_point)
+        num_books = outcome_books_count[okey]
+        if num_books < config.MIN_BOOKMAKERS:
+            low_books_count += 1
+            continue
 
         # ¿Pinnacle tiene este outcome exacto?
         if outcome_key not in pinnacle_market:
@@ -167,6 +191,7 @@ def find_value_bets(
                 if kelly_stake <= 0:
                     continue
                 pinnacle_odds_now = pinnacle_market.get(outcome_key)
+                avg_ev = _calc_avg_ev(book_odds, okey, outcome_odds_sum, outcome_books_count)
                 vb = ValueBet(
                     event_id=event_id,
                     sport_key=row["sport_key"],
@@ -185,6 +210,8 @@ def find_value_bets(
                     kelly_fraction=kelly_full,
                     kelly_stake_percent=kelly_stake * 100,
                     pinnacle_odds=pinnacle_odds_now,
+                    avg_ev_percent=avg_ev,
+                    num_books=num_books,
                     book_link=row.get("book_link"),
                     market_link=row.get("market_link"),
                     outcome_link=row.get("outcome_link"),
@@ -237,6 +264,7 @@ def find_value_bets(
         # Guardar odds de Pinnacle al momento de detectar (para CLV futuro)
         pinnacle_odds_now = pinnacle_market.get(outcome_key)
 
+        avg_ev = _calc_avg_ev(book_odds, okey, outcome_odds_sum, outcome_books_count)
         vb = ValueBet(
             event_id=event_id,
             sport_key=row["sport_key"],
@@ -255,6 +283,8 @@ def find_value_bets(
             kelly_fraction=kelly_full,
             kelly_stake_percent=kelly_stake * 100,
             pinnacle_odds=pinnacle_odds_now,
+            avg_ev_percent=avg_ev,
+            num_books=num_books,
             book_link=row.get("book_link"),
             market_link=row.get("market_link"),
             outcome_link=row.get("outcome_link"),
@@ -268,6 +298,10 @@ def find_value_bets(
         logger.warning(
             f"Filtradas {market_mismatch_count} odds por market type mismatch "
             f"(2-way vs 3-way)"
+        )
+    if low_books_count:
+        logger.info(
+            f"Filtradas {low_books_count} odds por min_books < {config.MIN_BOOKMAKERS}"
         )
     logger.info(
         f"Value bets encontradas: {len(value_bets)} "
@@ -308,3 +342,26 @@ def calculate_kelly(odds_decimal: float, fair_prob: float) -> float:
     q = 1.0 - fair_prob
     kelly = (fair_prob * b - q) / b
     return max(kelly, 0.0)
+
+
+def _calc_avg_ev(
+    book_odds: float,
+    okey: tuple,
+    outcome_odds_sum: dict,
+    outcome_books_count: Counter,
+) -> Optional[float]:
+    """
+    Calcula EV% vs odds promedio del mercado (consenso).
+
+    Inspirado en oddsapi_ev: si el mercado promedio implica P_avg,
+    y nuestras odds son mejores → señal secundaria de valor.
+
+    Retorna el EV% vs avg, o None si no hay suficientes datos.
+    """
+    count = outcome_books_count[okey]
+    if count < 2:
+        return None
+    avg_odds = outcome_odds_sum[okey] / count
+    # Fair prob implícita del consenso (sin devig, pero es una aproximación)
+    avg_implied = 1.0 / avg_odds
+    return (avg_implied * book_odds - 1.0) * 100.0

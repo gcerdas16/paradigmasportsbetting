@@ -16,6 +16,9 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# Mínimo profit % para considerar un arb (cubre latencia y cambios de odds)
+MIN_ARB_PROFIT_PERCENT = 0.5
+
 
 @dataclass
 class ArbLeg:
@@ -181,6 +184,19 @@ def _find_h2h_arb(
     if inv_sum < 1.0:
         profit_pct = (1.0 / inv_sum - 1.0) * 100.0
 
+        # Filtro: profit mínimo para cubrir latencia
+        if profit_pct < MIN_ARB_PROFIT_PERCENT:
+            return []
+
+        # Verificar que TODAS las patas usen bookmakers DISTINTOS
+        books_used = [best["book_key"] for best in best_per_outcome.values()]
+        if len(books_used) != len(set(books_used)):
+            logger.debug(
+                f"ARB descartado (mismo bookmaker en ambos lados): "
+                f"{home_team} vs {away_team} books={books_used}"
+            )
+            return []
+
         # Calcular stakes proporcionales
         legs = []
         for ok, best in best_per_outcome.items():
@@ -278,6 +294,19 @@ def _find_line_arb(
 
         if inv_sum < 1.0:
             profit_pct = (1.0 / inv_sum - 1.0) * 100.0
+
+            # Filtro: profit mínimo
+            if profit_pct < MIN_ARB_PROFIT_PERCENT:
+                continue
+
+            # Verificar bookmakers DISTINTOS en cada pata
+            books_used = [best["book_key"] for best in best_per_side.values()]
+            if len(books_used) != len(set(books_used)):
+                logger.debug(
+                    f"ARB line descartado (mismo bookmaker): "
+                    f"{home_team} vs {away_team} {market_key} L={point}"
+                )
+                continue
 
             legs = []
             for ok, best in best_per_side.items():

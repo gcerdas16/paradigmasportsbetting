@@ -77,6 +77,8 @@ class Bet(Base):
     bet_type = Column(String(16), default="value")  # "value" o "arb"
     arb_group_id = Column(String(64), nullable=True)  # Agrupa patas del mismo arb
     arb_profit_percent = Column(Float, nullable=True)  # % ganancia garantizada del arb
+    avg_ev_percent = Column(Float, nullable=True)  # EV% vs consenso de mercado
+    num_books = Column(Integer, nullable=True)  # Casas que ofrecen este outcome
     notes = Column(Text, nullable=True)
 
 
@@ -213,6 +215,8 @@ class Tracker:
                 stake=stake,
                 bankroll_before=current_bankroll,
                 is_paper=config.PAPER_TRADING,
+                avg_ev_percent=vb.avg_ev_percent,
+                num_books=vb.num_books,
             )
 
             session.add(bet)
